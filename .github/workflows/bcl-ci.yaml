@@ -1,0 +1,42 @@
+name: BCL CI
+
+on: 
+  push:
+    paths: 
+      - 'bcl/**'
+      - '.github/workflows/bcl-ci.yaml'
+    tags-ignore: 
+      - '*'
+    branches:
+      - '**'
+
+  schedule:
+    - cron: '0 0 * * 0' # Every Sunday at midnight
+
+jobs:
+  build: 
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: ./bcl
+    steps:
+      - name: 🟣 Setup .NET Core # Required to execute ReportGenerator
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.x
+          dotnet-quality: 'preview'
+
+      - name: 🧳 Checkout
+        uses: actions/checkout@v2
+
+      - name: 🔃 Restore 
+        run: dotnet restore
+
+      - name: 🏭 Build
+        run: dotnet build --configuration Release --no-restore --verbosity normal
+
+      - name: 🧪 Test
+        run: dotnet test --configuration Release --no-build --verbosity normal
