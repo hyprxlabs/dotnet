@@ -1,5 +1,6 @@
 # Hyprx.Lodi Changelog
 
-## 0.0.0
+## 0.0.0-alpha.0
 
-- features
+- Enable singleton, transient, and scoped registrations and resolution.
+- Enable creating scoped service providers.

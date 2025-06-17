@@ -7,9 +7,11 @@
 
   <PropertyGroup>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageTags>Hyprx.Exec</PackageTags>
+    <PackageTags>Exec Run Spawn Process</PackageTags>
     <Description>
-        Hyprx.Exec
+        A library for executing processes, spawning child processes, and running commands.
+        It provides a simple API for process management and execution.
+        It supports synchronous and asynchronous execution, capturing output, and handling errors.
     </Description>
     <PackageReleaseNotes Condition="Exists('$(MSBuildProjectDirectory)/CHANGELOG.md')">
       $([System.IO.File]::ReadAllText("$(MSBuildProjectDirectory)/CHANGELOG.md"))

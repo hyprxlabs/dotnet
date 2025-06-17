@@ -7,9 +7,10 @@
 
   <PropertyGroup>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageTags>Hyprx.Lodi</PackageTags>
+    <PackageTags>DI Dependency Injection</PackageTags>
     <Description>
-        Hyprx.Lodi
+        Hyprx.Lodi is a very simple implementation for DI that mainly uses delegates
+        to create objects to avoid reflection to enable AOT scenarios.
     </Description>
     <PackageReleaseNotes Condition="Exists('$(MSBuildProjectDirectory)/CHANGELOG.md')">
       $([System.IO.File]::ReadAllText("$(MSBuildProjectDirectory)/CHANGELOG.md"))

@@ -9,7 +9,8 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageTags>Hyprx Ansi Color Terminal</PackageTags>
     <Description>
-        Hyprx.Ansi
+        Hyprx.Ansi provides basic terminal color detection and ansi escape
+        codes for styling colors and formatting text in console applications.
     </Description>
     <PackageReleaseNotes Condition="Exists('$(MSBuildProjectDirectory)/CHANGELOG.md')">
       $([System.IO.File]::ReadAllText("$(MSBuildProjectDirectory)/CHANGELOG.md"))

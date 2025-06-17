@@ -1,18 +1,15 @@
 <Project>
   <!-- See https://aka.ms/dotnet/msbuild/customize for more details on customizing your build -->
 
-  <PropertyGroup>
-    <BaseRepoUrl>https://github.com/hyprxland/dotnet-sdk</BaseRepoUrl>
-  </PropertyGroup>
 
   <PropertyGroup>
     <Company>hyprx</Company>
-    <Copyright>©️ 2010-2025 Hyprxdev  Hyprxland</Copyright>
-    <RepositoryUrl>$(BaseTreeUrl)</RepositoryUrl> 
+    <Copyright>©️ 2010-2025 Hyprxdev  Hyprx labs</Copyright>
+    <RepositoryUrl>https://github.com/hyprxlabs/dotnet</RepositoryUrl> 
     <RepositoryType>git</RepositoryType> 
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <Authors>Jolt9Dev</Authors>
-    <ProjectUrl>https://hyprx.land</ProjectUrl>
+    <Authors>hyprxdev</Authors>
+    <ProjectUrl>https://hyprxlabs.com/dotnet</ProjectUrl>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <AnalysisLevel>7</AnalysisLevel>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
@@ -38,7 +35,7 @@
     <AlphaDir>$(MSBuildThisFileDirectory)alpha</AlphaDir>
     <LibDir>$(MSBuildThisFileDirectory)lib</LibDir>
     <AssetsDir>$(MSBuildThisFileDirectory)assets</AssetsDir>
-    <IconPath>$(MSBuildThisFileDirectory)eng/hyprx_logo_256.png</IconPath>
+    <IconPath>$(MSBuildThisFileDirectory)eng/assets/hyprx_logo_256.png</IconPath>
     <LicensePath>$(MSBuildThisFileDirectory)LICENSE.md</LicensePath>
     <NetLegacy>false</NetLegacy>
     <NetFramework>false</NetFramework>

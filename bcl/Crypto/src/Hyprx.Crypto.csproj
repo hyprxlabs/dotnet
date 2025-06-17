@@ -7,9 +7,11 @@
 
   <PropertyGroup>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageTags>Hyprx.Crypto</PackageTags>
+    <PackageTags>Crypt ChaCha20 Salsa20 Blake2b AES</PackageTags>
     <Description>
-        Hyprx.Crypto
+        Algorithms such as ChaCha20, Salsa20, and Blake2b,
+        and an AES encryption provider for AES 256 CBC which
+        with pbkdf2 and HMAC SHA256 key derivation.
     </Description>
     <PackageReleaseNotes Condition="Exists('$(MSBuildProjectDirectory)/CHANGELOG.md')">
       $([System.IO.File]::ReadAllText("$(MSBuildProjectDirectory)/CHANGELOG.md"))

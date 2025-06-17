@@ -7,9 +7,11 @@
 
   <PropertyGroup>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageTags>Hyprx.Shell</PackageTags>
+    <PackageTags>Shell SingleFile Scripting Hyprx</PackageTags>
     <Description>
-        Hyprx.Shell
+        Shell makes it easier to use functionality in .NET single file apps similar to what
+you would find in a shell script such as common posix file system utilities, echo,
+print, running commands, and more.
     </Description>
     <PackageReleaseNotes Condition="Exists('$(MSBuildProjectDirectory)/CHANGELOG.md')">
       $([System.IO.File]::ReadAllText("$(MSBuildProjectDirectory)/CHANGELOG.md"))

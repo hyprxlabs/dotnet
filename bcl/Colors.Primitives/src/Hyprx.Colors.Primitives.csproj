@@ -7,9 +7,10 @@
 
   <PropertyGroup>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageTags>Hyprx.Colors.Primitives</PackageTags>
+    <PackageTags>Color Format Primitives</PackageTags>
     <Description>
-        Hyprx.Colors.Primitives
+        Primitive structs that present color formats such as Rgb, Hex, Argb. 
+        Basic parsing and conversion logic is included.
     </Description>
     <PackageReleaseNotes Condition="Exists('$(MSBuildProjectDirectory)/CHANGELOG.md')">
       $([System.IO.File]::ReadAllText("$(MSBuildProjectDirectory)/CHANGELOG.md"))

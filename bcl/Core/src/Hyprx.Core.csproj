@@ -7,9 +7,12 @@
 
   <PropertyGroup>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageTags>Hyprx.Core</PackageTags>
+    <PackageTags>Result FileSystem BCL Hyprx Env Environment</PackageTags>
     <Description>
-        Hyprx.Core
+        Hyprx.Core extends the the .NET Base Class Library 
+        with missing key functionality such as Result type, 
+        Posix file system operations, enhanced env variables
+        operations, and more.
     </Description>
     <PackageReleaseNotes Condition="Exists('$(MSBuildProjectDirectory)/CHANGELOG.md')">
       $([System.IO.File]::ReadAllText("$(MSBuildProjectDirectory)/CHANGELOG.md"))

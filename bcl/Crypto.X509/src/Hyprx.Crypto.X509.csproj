@@ -7,9 +7,10 @@
 
   <PropertyGroup>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageTags>Hyprx.Crypto.X509</PackageTags>
+    <PackageTags>X509 Hyprx</PackageTags>
     <Description>
-        Hyprx.Crypto.X509
+       Provides a certificate builder for generating self signed certificates, including chained certificates
+       which can enable setting up a local PKI.
     </Description>
     <PackageReleaseNotes Condition="Exists('$(MSBuildProjectDirectory)/CHANGELOG.md')">
       $([System.IO.File]::ReadAllText("$(MSBuildProjectDirectory)/CHANGELOG.md"))
