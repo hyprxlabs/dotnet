@@ -5,6 +5,14 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageVersion Include="AsyncFixer" Version="1.6.0" />
+    <PackageVersion Include="Hyprx.Core" Version="[0.0.0-alpha.0,)" />
+    <PackageVersion Include="Hyprx.Exec" Version="[0.0.0-alpha.0,)" />
+    <PackageVersion Include="Hyprx.Ansi" Version="[0.0.0-alpha.0,)" />
+    <PackageVersion Include="Hyprx.DotEnv" Version="[0.0.0-alpha.0,)" />
+    <PackageVersion Include="Hyprx.Lodi" Version="[0.0.0-alpha.0,)" />
+    <PackageVersion Include="Hyprx.Secrets" Version="[0.0.0-alpha.0,)" />
+    <PackageVersion Include="Hyprx.Secrets.OperatingSystem" Version="[0.0.0-alpha.0,)" />
+    <PackageVersion Include="Hyprx.Shell" Version="[0.0.0-alpha.0,)" />
     <PackageVersion Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="4.14.0" />
     <PackageVersion Include="Microsoft.Bcl.HashCode" Version="6.0.0" />
     <PackageVersion Include="Microsoft.Extensions.FileSystemGlobbing" Version="0.0.0-preview.4.25258.110" />
@@ -19,6 +27,7 @@
     <PackageVersion Include="System.Memory.Data" Version="9.0.5" />
     <PackageVersion Include="System.Threading.Tasks.Extensions" Version="4.6.3" />
     <PackageVersion Include="Text.Analyzers"  Version="4.14.0"/>  
+
     <PackageVersion Include="xunit.v3" Version="2.0.2" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.0" />
   </ItemGroup>

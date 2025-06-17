@@ -38,6 +38,8 @@
     <LicensePath>$(MSBuildThisFileDirectory)/LICENSE.md</LicensePath>
     <NetLegacy>false</NetLegacy>
     <NetFramework>false</NetFramework>
+
+    <ReferenceBcl>false</ReferenceBcl>
   </PropertyGroup>
 
   <PropertyGroup Condition="($(TargetFramework.StartsWith('net4')) OR  $(TargetFramework.StartsWith('netstandard2.0')) OR $(TargetFramework.StartsWith('netstandard1')))">

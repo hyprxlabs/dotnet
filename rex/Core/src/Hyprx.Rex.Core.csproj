@@ -8,11 +8,13 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageTags>Hyprx.Rex.Core Rex TaskRunnner Tasks Runner</PackageTags>
     <Description>
-        Hyprx.Rex.Core
+        Rex primitives for defining tasks, jobs, and deployments.
     </Description>
     <PackageReleaseNotes Condition="Exists('$(MSBuildProjectDirectory)/CHANGELOG.md')">
       $([System.IO.File]::ReadAllText("$(MSBuildProjectDirectory)/CHANGELOG.md"))
     </PackageReleaseNotes>
+    <PackageLicenseFile Condition="Exists('$(LicensePath)')">LICENSE.md</PackageLicenseFile>
+    <PackageIcon  Condition="Exists('$(IconPath)')">hyprx_logo_256.png</PackageIcon>
   </PropertyGroup>
 
   <ItemGroup>
@@ -28,7 +30,13 @@
     </AssemblyAttribute>
   </ItemGroup>
 
-  <ItemGroup>
+  <ItemGroup Condition="'$(ReferenceBcl)' == 'true'">
     <ProjectReference Include="$(BclDir)/Core/src/*.csproj" />  
   </ItemGroup>
+
+  <ItemGroup Condition="'$(ReferenceBcl)' != 'true'">
+    <PackageReference Include="Hyprx.Core" />
+  </ItemGroup>
+      
+ 
 </Project>

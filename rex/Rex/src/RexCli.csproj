@@ -4,19 +4,37 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
     <AssemblyName>rex</AssemblyName>
-    <PackAsTool>true</PackAsTool>
-    <ToolCommandName>rex</ToolCommandName>
-    <PackageOutputPath>./nupkg</PackageOutputPath>
     <NoWarn>$(NoWarn);SA1516</NoWarn>
+
+    <PackAsTool>true</PackAsTool>
+    <PackageId>dotnet-rex</PackageId>
+    <ToolCommandName>rex</ToolCommandName>
+    
+    <PackageOutputPath>../../artifacts/packages</PackageOutputPath>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageLicenseFile Condition="Exists('$(LicensePath)')">LICENSE.md</PackageLicenseFile>
+    <PackageIcon  Condition="Exists('$(IconPath)')">hyprx_logo_256.png</PackageIcon>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>Hyprx.Rex.Pipelines Rex TaskRunnner Tasks Runner</PackageTags>
+    <Description>
+        Hyprx.Rex.Pipelines provides the core pipelines that execute rex tasks, jobs, and deployments.
+    </Description>
+    <PackageReleaseNotes Condition="Exists('$(MSBuildProjectDirectory)/CHANGELOG.md')">
+      $([System.IO.File]::ReadAllText("$(MSBuildProjectDirectory)/CHANGELOG.md"))
+    </PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="System.CommandLine" />
+    <None Condition="Exists('README.md')" Include="README.md" Pack="true" PackagePath="\"/>
+    <None Condition="Exists('$(LicensePath)')" Include="$(LicensePath)" Pack="true" PackagePath="\"/>
+    <None Condition="Exists('$(IconPath)')" Include="$(IconPath)" Pack="true" PackagePath="\" />
   </ItemGroup>
 
   <ItemGroup>
-   
-  
+    <PackageReference Include="System.CommandLine" />
   </ItemGroup>
 
 </Project>

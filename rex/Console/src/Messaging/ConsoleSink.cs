@@ -167,6 +167,7 @@ public class ConsoleSink : IMessageSink
 
             case TaskCompleted taskCompleted:
                 Console.WriteLine($"{RexPrefix()} {Symbol()} {Ansi.BrightBlack("run")} {taskCompleted.Data.Name} {Ansi.Green("completed")}");
+                Console.WriteLine();
                 return Task.FromResult(false);
 
             case TaskSkipped taskSkipped:
@@ -182,6 +183,7 @@ public class ConsoleSink : IMessageSink
                 return Task.FromResult(false);
 
             case TaskStarted taskStarted:
+                Console.WriteLine();
                 Console.WriteLine($"{RexPrefix()} {Symbol()} {Ansi.BrightBlack("run")} {taskStarted.Data.Name}");
                 return Task.FromResult(false);
 

@@ -20,6 +20,8 @@ public class RexConsoleOptions
 
     public string Cmd { get; set; } = "auto";
 
+    public string[] ListTargets { get; set; } = [];
+
     public string DeploymentAction { get; set; } = "deploy";
 
     public int Timeout { get; set; } = 0;

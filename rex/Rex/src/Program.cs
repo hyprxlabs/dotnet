@@ -1,6 +1,7 @@
 ﻿// See https://aka.ms/new-console-template for more information
 #pragma warning disable SA1516
 using System.CommandLine;
+using System.CommandLine.Invocation;
 using System.Diagnostics;
 
 using Rex;
@@ -65,16 +66,7 @@ var listCommand = new Command("list", "List all available tasks.")
     return 1;
 });
 
-var taskCommand = new Command("tasks", "Run a specific task.")
-{
-    fileOption,
-    timeoutOption,
-    enviroment,
-    environmentFileOption,
-    secretFileOption,
-    verboseOption,
-    targetsArgument,
-}.WithHandler((ctx) =>
+Func<InvocationContext, int> runTask = (ctx) =>
 {
     var fileInfo = ctx.ParseResult.GetValueForOption(fileOption);
     var file = fileInfo?.FullName;
@@ -159,9 +151,9 @@ var taskCommand = new Command("tasks", "Run a specific task.")
     }
 
     return 1;
-});
+};
 
-var jobsCommand = new Command("jobs", "Manage background jobs.")
+var taskCommand = new Command("tasks", "Run a specific task.")
 {
     fileOption,
     timeoutOption,
@@ -170,8 +162,22 @@ var jobsCommand = new Command("jobs", "Manage background jobs.")
     secretFileOption,
     verboseOption,
     targetsArgument,
-}
-.WithHandler(ctx =>
+}.WithHandler(runTask);
+
+var taskRunCommand = new Command("run", "Run a specific task.")
+{
+    fileOption,
+    timeoutOption,
+    enviroment,
+    environmentFileOption,
+    secretFileOption,
+    verboseOption,
+    targetsArgument,
+}.WithHandler(runTask);
+
+taskCommand.AddCommand(taskRunCommand);
+
+Func<InvocationContext, int> runJobs = (ctx) =>
 {
     var fileInfo = ctx.ParseResult.GetValueForOption(fileOption);
     var file = fileInfo?.FullName;
@@ -255,7 +261,31 @@ var jobsCommand = new Command("jobs", "Manage background jobs.")
     }
 
     return 1;
-});
+};
+
+var jobsCommand = new Command("jobs", "Manage background jobs.")
+{
+    fileOption,
+    timeoutOption,
+    enviroment,
+    environmentFileOption,
+    secretFileOption,
+    verboseOption,
+    targetsArgument,
+}
+.WithHandler(runJobs);
+
+var jobsRunCommand = new Command("run", "Run a specific job.")
+{
+    fileOption,
+    timeoutOption,
+    enviroment,
+    environmentFileOption,
+    secretFileOption,
+    verboseOption,
+    targetsArgument,
+}.WithHandler(runJobs);
+jobsCommand.AddCommand(jobsRunCommand);
 
 var deployCommand = new Command("deploy", "Deploy a specific deployment.")
 {
@@ -551,6 +581,96 @@ var root = new RootCommand("rex")
     deployCommand,
     rollbackCommand,
     destroyCommand,
+    fileOption,
+    timeoutOption,
+    enviroment,
+    environmentFileOption,
+    secretFileOption,
+    verboseOption,
+    targetsArgument,
 };
+
+root.WithHandler(ctx =>
+{
+    var fileInfo = ctx.ParseResult.GetValueForOption(fileOption);
+    var file = fileInfo?.FullName;
+    if (file is null)
+    {
+        file = Project.FindProject(Environment.CurrentDirectory);
+    }
+    else
+    {
+        if (!Path.IsPathFullyQualified(file))
+        {
+            file = Path.GetFullPath(file, Environment.CurrentDirectory);
+        }
+    }
+
+    if (file is null)
+    {
+        Console.WriteLine($"No rexfile.cs, .rex/main.cs or .rex/*.csproj found in the {Environment.CurrentDirectory}.");
+        return 1;
+    }
+
+    var timeout = ctx.ParseResult.GetValueForOption(timeoutOption);
+    var env = ctx.ParseResult.GetValueForOption(enviroment);
+    var envFiles = ctx.ParseResult.GetValueForOption(environmentFileOption);
+    var secretFile = ctx.ParseResult.GetValueForOption(secretFileOption);
+    var verbose = ctx.ParseResult.GetValueForOption(verboseOption);
+    var targets = ctx.ParseResult.GetValueForArgument<string[]>(targetsArgument);
+
+    var remaining = ctx.ParseResult.UnparsedTokens;
+
+    var args = new List<string>()
+    {
+    };
+    if (verbose)
+        args.Add("-v");
+    if (timeout.HasValue)
+        args.Add($"-t {timeout.Value}");
+
+    if (env is not null)
+    {
+        foreach (var e in env)
+            args.Add($"-e {e}");
+    }
+
+    if (envFiles is not null)
+    {
+        foreach (var f in envFiles)
+            args.Add($"--env-file {f.FullName}");
+    }
+
+    if (secretFile is not null)
+    {
+        foreach (var f in secretFile)
+            args.Add($"--secret-file {f.FullName}");
+    }
+
+    args.AddRange(targets);
+
+    if (remaining is not null)
+        args.AddRange(remaining);
+
+    if (file.EndsWith(".csproj"))
+    {
+        Process.Start("dotnet", $"run -v quiet --project {file} {string.Join(" ", args)}")?.WaitForExit();
+        return 0;
+    }
+
+    if (file.EndsWith(".cs"))
+    {
+        Process.Start("dotnet", $"run -v quiet {file}  {string.Join(" ", args)}")?.WaitForExit();
+        return 0;
+    }
+
+    if (file.EndsWith(".dll"))
+    {
+        Process.Start("dotnet", $"{file}  {string.Join(" ", args)}")?.WaitForExit();
+        return 0;
+    }
+
+    return 1;
+});
 
 await root.InvokeAsync(args);

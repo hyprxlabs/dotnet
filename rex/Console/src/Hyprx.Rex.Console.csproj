@@ -8,16 +8,18 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageTags>Hyprx.Rex.Console Rex TaskRunnner Tasks Runner</PackageTags>
     <Description>
-        Hyprx.Rex.Console
+        The Hyprx.Rex.Console package enables you to create a cli task runner or
+a make-like experience in .NET within console projects or using `dotnet run app.cs` (single files).
     </Description>
     <PackageReleaseNotes Condition="Exists('$(MSBuildProjectDirectory)/CHANGELOG.md')">
       $([System.IO.File]::ReadAllText("$(MSBuildProjectDirectory)/CHANGELOG.md"))
     </PackageReleaseNotes>
+    <PackageLicenseFile Condition="Exists('$(LicensePath)')">LICENSE.md</PackageLicenseFile>
   </PropertyGroup>
 
   <ItemGroup>
     <None Condition="Exists('README.md')" Include="README.md" Pack="true" PackagePath="\"/>
-    <None Condition="Exists('$(LicensePath)')" Include="$(LicensePath)" Pack="true" PackagePath="\"/>
+    <None Condition="Exists('$(LicensePath)')" Include="$(LicensePath)" Pack="true" PackagePath=""/>
     <None Condition="Exists('$(IconPath)')" Include="$(IconPath)" Pack="true" PackagePath="\" />
   </ItemGroup>
 
@@ -31,9 +33,19 @@
   <ItemGroup>
      <ProjectReference Include="$(RexDir)/Core/src/*.csproj" />
      <ProjectReference Include="$(RexDir)/Pipelines/src/*.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(ReferenceBcl)' == 'true'">
      <ProjectReference Include="$(BclDir)/Lodi/src/*.csproj" />
      <ProjectReference Include="$(BclDir)/DotEnv/src/*.csproj" />
      <ProjectReference Include="$(BclDir)/Secrets/src/*.csproj" />
      <ProjectReference Include="$(BclDir)/Ansi/src/*.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(ReferenceBcl)' != 'true'">
+    <PackageReference Include="Hyprx.Lodi" />
+    <PackageReference Include="Hyprx.DotEnv" />
+    <PackageReference Include="Hyprx.Secrets" />
+    <PackageReference Include="Hyprx.Ansi" />
   </ItemGroup>
 </Project>

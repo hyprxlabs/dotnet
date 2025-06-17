@@ -418,22 +418,45 @@ public static class RexConsole
 
             case "list":
                 {
-                    if (globalTasks.Count > 0)
+                    if (options.ListTargets.Length == 0)
+                        options.ListTargets = ["tasks", "jobs", "deployments"];
+
+                    var la = options.ListTargets.ToList();
+
+                    if (la.Contains("tasks") && globalTasks.Count > 0)
                     {
-                        Console.WriteLine("Tasks:");
+                        Console.WriteLine("TASKS:");
+                        var max = globalTasks.Keys.Max(k => k.Length);
                         foreach (var kvp in globalTasks)
                         {
-                            Console.WriteLine($"- {kvp.Key}: {kvp.Value.Description}");
+                            Console.WriteLine($"  {Ansi.Blue(kvp.Key.PadRight(max))}   {kvp.Value.Description}");
                         }
+
+                        Console.WriteLine();
                     }
 
-                    if (globalJobs.Count > 0)
+                    if (la.Contains("jobs") && globalJobs.Count > 0)
                     {
-                        Console.WriteLine("Jobs:");
+                        Console.WriteLine("JOBS:");
+                        var max = globalJobs.Keys.Max(k => k.Length);
                         foreach (var kvp in globalJobs)
                         {
-                            Console.WriteLine($"- {kvp.Key}: {kvp.Value.Description}");
+                            Console.WriteLine($"  {Ansi.Blue(kvp.Key.PadRight(max))}   {kvp.Value.Description}");
                         }
+
+                        Console.WriteLine();
+                    }
+
+                    if (la.Contains("deployments") && globalDeployments.Count > 0)
+                    {
+                        Console.WriteLine("DEPLOYMENTS:");
+                        var max = globalDeployments.Keys.Max(k => k.Length);
+                        foreach (var kvp in globalDeployments)
+                        {
+                            Console.WriteLine($"  {Ansi.Blue(kvp.Key.PadRight(max))}   {kvp.Value.Description}");
+                        }
+
+                        Console.WriteLine();
                     }
                 }
 
@@ -451,6 +474,8 @@ public static class RexConsole
         var targets = new List<string>();
         var additionalArgs = new List<string>();
 
+        var isList = Array.IndexOf(args, "--list") >= 0 || Array.IndexOf(args, "-l") >= 0;
+
         for (var i = 0; i < args.Length; i++)
         {
             var current = args[i];
@@ -465,25 +490,37 @@ public static class RexConsole
                 {
                     case "--task":
                     case "--tasks":
+                        if (isList)
+                            continue;
+
                         options.Cmd = "task";
                         break;
 
                     case "--job":
                     case "--jobs":
+                        if (isList)
+                            continue;
+
                         options.Cmd = "job";
                         break;
 
                     case "--deploy":
+                        if (isList)
+                            continue;
                         options.Cmd = "deploy";
                         options.DeploymentAction = "deploy";
                         break;
 
                     case "--destroy":
+                        if (isList)
+                            continue;
                         options.Cmd = "deploy";
                         options.DeploymentAction = "destroy";
                         break;
 
                     case "--rollback":
+                        if (isList)
+                            continue;
                         options.Cmd = "deploy";
                         options.DeploymentAction = "rollback";
                         break;
@@ -491,6 +528,23 @@ public static class RexConsole
                     case "--list":
                     case "-l":
                         options.Cmd = "list";
+                        var listArgs = new List<string>();
+                        if (Array.IndexOf(args, "--tasks") >= 0 || Array.IndexOf(args, "--task") >= 0)
+                        {
+                            listArgs.Add("tasks");
+                        }
+
+                        if (Array.IndexOf(args, "--jobs") >= 0 || Array.IndexOf(args, "--job") >= 0)
+                        {
+                            listArgs.Add("jobs");
+                        }
+
+                        if (Array.IndexOf(args, "--deployments") >= 0 || Array.IndexOf(args, "--deployment") >= 0)
+                        {
+                            listArgs.Add("deployments");
+                        }
+
+                        options.ListTargets = listArgs.ToArray();
                         break;
 
                     case "--dry-run":
