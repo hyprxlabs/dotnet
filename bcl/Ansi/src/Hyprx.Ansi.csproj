@@ -5,6 +5,9 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
+
+
+
   <PropertyGroup>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageTags>Hyprx Ansi Color Terminal</PackageTags>
@@ -15,14 +18,15 @@
     <PackageReleaseNotes Condition="Exists('$(MSBuildProjectDirectory)/CHANGELOG.md')">
       $([System.IO.File]::ReadAllText("$(MSBuildProjectDirectory)/CHANGELOG.md"))
     </PackageReleaseNotes>
-    <PackageLicenseFile Condition="Exists('$(LicensePath)')">LICENSE.md</PackageLicenseFile>
+    <PackageLicenseFile>LICENSE.md</PackageLicenseFile>
   </PropertyGroup>
 
   <ItemGroup>
     <None Condition="Exists('README.md')" Include="README.md" Pack="true" PackagePath="\"/>
-    <None Condition="Exists('$(LicensePath)')" Include="$(LicensePath)" Pack="true" PackagePath="\"/>
+    <None Condition="Exists('$(LicensePath)')" Include="$(LicensePath)" Pack="true" PackagePath=""/>
     <None Condition="Exists('$(IconPath)')" Include="$(IconPath)" Pack="true" PackagePath="\" />
   </ItemGroup>
+
 
   <ItemGroup>
       <AssemblyAttribute Include="System.CLSCompliant">

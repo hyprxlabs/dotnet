@@ -22,7 +22,7 @@
 
   <ItemGroup>
     <None Condition="Exists('README.md')" Include="README.md" Pack="true" PackagePath="\"/>
-    <None Condition="Exists('$(LicensePath)')" Include="$(LicensePath)" Pack="true" PackagePath="\"/>
+    <None Condition="Exists('$(LicensePath)')" Include="$(LicensePath)" Pack="true" PackagePath=""/>
     <None Condition="Exists('$(IconPath)')" Include="$(IconPath)" Pack="true" PackagePath="\" />
   </ItemGroup>
 
