@@ -14,13 +14,13 @@
       $([System.IO.File]::ReadAllText("$(MSBuildProjectDirectory)/CHANGELOG.md"))
     </PackageReleaseNotes>
     <PackageLicenseFile Condition="Exists('$(LicensePath)')">LICENSE.md</PackageLicenseFile>
-    <PackageIcon  Condition="Exists('$(IconPath)')">hyprx_logo_256.png</PackageIcon>
+    <PackageIcon>hyprx_logo_256.png</PackageIcon>
   </PropertyGroup>
 
   <ItemGroup>
-    <None Condition="Exists('README.md')" Include="README.md" Pack="true" PackagePath="\"/>
-    <None Condition="Exists('$(LicensePath)')" Include="$(LicensePath)" Pack="true" PackagePath="\"/>
-    <None Condition="Exists('$(IconPath)')" Include="$(IconPath)" Pack="true" PackagePath="\" />
+    <None Condition="Exists('README.md')" Include="README.md" Pack="true" PackagePath=""/>
+    <None Condition="Exists('$(LicensePath)')" Include="$(LicensePath)" Pack="true" PackagePath=""/>
+    <None Condition="Exists('$(IconPath)')" Include="$(IconPath)" Pack="true" PackagePath="" />
   </ItemGroup>
 
   <ItemGroup>
