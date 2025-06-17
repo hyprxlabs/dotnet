@@ -7,7 +7,6 @@
     <Copyright>©️ 2010-2025 Hyprxdev  Hyprx labs</Copyright>
     <RepositoryUrl>https://github.com/hyprxlabs/dotnet</RepositoryUrl> 
     <RepositoryType>git</RepositoryType> 
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <Authors>hyprxdev</Authors>
     <ProjectUrl>https://hyprxlabs.com/dotnet</ProjectUrl>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
@@ -18,8 +17,6 @@
     <SuppressNETStableSdkPreviewMessage>true</SuppressNETStableSdkPreviewMessage>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <LicensePath>$(MSBuildThisFileDirectory)LICENSE.md</LicensePath>
-    <PackageLicenseUrl>https://raw.githubusercontent.com/hyprxlabs/dotnet/refs/heads/main/LICENSE.md</PackageLicenseUrl>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -38,7 +35,6 @@
     <LibDir>$(MSBuildThisFileDirectory)lib</LibDir>
     <AssetsDir>$(MSBuildThisFileDirectory)assets</AssetsDir>
     <IconPath>$(MSBuildThisFileDirectory)eng/assets/hyprx_logo_256.png</IconPath>
-    <LicensePath>$(MSBuildThisFileDirectory)LICENSE.md</LicensePath>
     <NetLegacy>false</NetLegacy>
     <NetFramework>false</NetFramework>
   </PropertyGroup>
