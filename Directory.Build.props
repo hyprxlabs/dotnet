@@ -18,6 +18,8 @@
     <SuppressNETStableSdkPreviewMessage>true</SuppressNETStableSdkPreviewMessage>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <LicensePath>$(MSBuildThisFileDirectory)LICENSE.md</LicensePath>
+    <PackageLicenseUrl>https://raw.githubusercontent.com/hyprxlabs/dotnet/refs/heads/main/LICENSE.md</PackageLicenseUrl>
   </PropertyGroup>
 
   <PropertyGroup>

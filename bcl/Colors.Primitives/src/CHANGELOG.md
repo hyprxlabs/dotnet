@@ -1,5 +1,5 @@
 # Hyprx.Colors.Primitives Changelog
 
-## 0.0.0
+## 0.0.0-alpha.0
 
-- features
+Provide hex, rgb, rgba, argb primitives.
