@@ -13,6 +13,7 @@
     <PackageVersion Include="Hyprx.Secrets" Version="[0.0.0-alpha.0,)" />
     <PackageVersion Include="Hyprx.Secrets.OperatingSystem" Version="[0.0.0-alpha.0,)" />
     <PackageVersion Include="Hyprx.Shell" Version="[0.0.0-alpha.0,)" />
+    <PackageVersion Include="Hyprx.Rex.Console" Version="[0.0.0-alpha.0,)" />
     <PackageVersion Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="4.14.0" />
     <PackageVersion Include="Microsoft.Bcl.HashCode" Version="6.0.0" />
     <PackageVersion Include="Microsoft.Extensions.FileSystemGlobbing" Version="0.0.0-preview.4.25258.110" />
