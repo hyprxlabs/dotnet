@@ -27,16 +27,16 @@
 
   <ItemGroup>
     <!--#if(!NoReadme)-->
-    <None Condition="Exists('README.md')" Include="README.md" Pack="true" PackagePath="\"/>
+    <None Condition="Exists('README.md')" Include="README.md" Pack="true" PackagePath=""/>
     <!--#endif-->
     <!--#if(LicenseFile)-->
-    <None Condition="Exists('LICENSE.md')" Include="LICENSE.md" Pack="true" PackagePath="\"/>
+    <None Condition="Exists('LICENSE.md')" Include="LICENSE.md" Pack="true" PackagePath=""/>
     <!--#endif-->
     <!--#if(UseLicensePath)-->
-    <None Condition="Exists('$(LicensePath)')" Include="$(LicensePath)" Pack="true" PackagePath="\"/>
+    <None Condition="Exists('$(LicensePath)')" Include="$(LicensePath)" Pack="true" PackagePath=""/>
     <!--#endif-->
     <!--#if(UseIconPath)-->
-    <None Condition="Exists('$(IconPath)')" Include="$(IconPath)" Pack="true" PackagePath="\" />
+    <None Condition="Exists('$(IconPath)')" Include="$(IconPath)" Pack="true" PackagePath="" />
     <!--#endif-->
   </ItemGroup>
 
