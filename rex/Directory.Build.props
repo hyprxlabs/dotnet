@@ -2,10 +2,11 @@
      <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)..\'))" />
      
      <PropertyGroup>
-        <Version>0.0.0-alpha.1</Version>
+        <Version>0.0.0-alpha.2</Version>
         <IsTrimmable Condition="'NetLegacy' == 'false'">true</IsTrimmable>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <LangVersion>preview</LangVersion>
+        <PackageOutputPath>$(RexDir)/.artifacts/pack</PackageOutputPath>
      </PropertyGroup>
 </Project>

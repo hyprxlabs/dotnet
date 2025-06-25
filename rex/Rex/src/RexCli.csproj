@@ -10,7 +10,7 @@
     <PackageId>dotnet-rex</PackageId>
     <ToolCommandName>rex</ToolCommandName>
     
-    <PackageOutputPath>../../artifacts/packages</PackageOutputPath>
+    <PackageOutputPath>../../.artifacts/pack</PackageOutputPath>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageLicenseFile Condition="Exists('$(LicensePath)')">LICENSE.md</PackageLicenseFile>
     <PackageIcon>hyprx_logo_256.png</PackageIcon>
