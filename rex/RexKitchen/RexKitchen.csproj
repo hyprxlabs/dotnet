@@ -11,7 +11,14 @@
 
   <ItemGroup>
     <ProjectReference Include="$(RexDir)/Console/src/*.csproj" />
-    <ProjectReference Include="$(BclDir)/Shell/src/*.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(ReferenceBcl)' == 'true'">
+     <ProjectReference Include="$(BclDir)/Shell/src/*.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(ReferenceBcl)' != 'true'">
+    <PackageReference Include="Hyprx.Shell" />
   </ItemGroup>
 
 </Project>

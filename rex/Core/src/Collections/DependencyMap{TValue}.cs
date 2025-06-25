@@ -1,9 +1,10 @@
+using Hyprx.Collections.Generic;
 using Hyprx.Results;
 using Hyprx.Rex.Execution;
 
 namespace Hyprx.Rex.Collections;
 
-public class DependencyMap<TValue> : OrderedKeyMap<TValue>
+public class DependencyMap<TValue> : OrderedMap<TValue>
     where TValue : INeedful
 {
     public DependencyMap()

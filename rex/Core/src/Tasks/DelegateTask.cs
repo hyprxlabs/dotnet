@@ -139,8 +139,19 @@ public class TaskBuilder
 
     public TaskBuilder WithEnv(IEnumerable<KeyValuePair<string, string>> env)
     {
-        var map = new StringMap(new Dictionary<string, string>(env, StringComparer.OrdinalIgnoreCase));
+        var map = new StringMap(env!);
         this.task.Env = map;
+        return this;
+    }
+
+    public TaskBuilder WithNeeds(IEnumerable<string> needs)
+    {
+        if (needs == null)
+        {
+            throw new ArgumentNullException(nameof(needs));
+        }
+
+        this.task.Needs = needs.ToArray();
         return this;
     }
 

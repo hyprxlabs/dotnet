@@ -10,6 +10,18 @@ Task("hello", () => Echo("Hello from RexKitchen!"));
 
 Task("env", () => Echo(Env.Expand("$MY_VALUE")));
 
+Task("build", () => Echo("Building..."));
+
+Task("inspect", (ctx) =>
+{
+    Echo($"Context: {ctx.Name}");
+    Echo($"Task: {ctx.Data.Id}");
+    Echo($"Env: {string.Join(", ", ctx.Env)}");
+    Echo($"Needs: {string.Join(", ", ctx.Data.Needs)}");
+    Echo($"Args: {string.Join(", ", ctx.Args)}");
+})
+.WithNeeds(["hello"]);
+
 Job("job1", (job) =>
 {
     // addes the global task "hello" as a dependency to all tasks in this job
@@ -20,20 +32,10 @@ Job("job1", (job) =>
     job.Task("task2", () => Echo("Task 2"));
 });
 
-Deployment("deploy1",
-    (ctx) =>
-    {
-        Echo("Starting deployment...");
-        Echo("Deployment finished.");
-    })
-    .BeforeDeploy((before) =>
-    {
-        before.Task("hello", () => Echo("Preparing to say hello..."));
-    })
-    .WithRollback(() =>
-    {
-        Echo("Rolling back deployment...");
-        Echo("Rollback complete.");
-    });
+UseNamespace("mssql", true, () =>
+{
+    Task("up", () => Echo("Hello from MSSQL!"));
+    Task("down", () => Echo("Goodbye from MSSQL!"));
+});
 
 return await RunTasksAsync(args);

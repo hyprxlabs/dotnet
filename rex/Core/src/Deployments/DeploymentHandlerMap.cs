@@ -2,7 +2,7 @@ using Hyprx.Rex.Collections;
 
 namespace Hyprx.Rex.Deployments;
 
-public class DeploymentHandlerMap : KeyMap<IDeploymentHandler>
+public class DeploymentHandlerMap : Map<IDeploymentHandler>
 {
     public DeploymentHandlerMap()
     {

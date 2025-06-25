@@ -2,7 +2,7 @@ using Hyprx.Rex.Collections;
 
 namespace Hyprx.Rex.Tasks;
 
-public class TaskHandlerMap : KeyMap<ITaskHandler>
+public class TaskHandlerMap : Map<ITaskHandler>
 {
     public TaskHandlerMap()
     {

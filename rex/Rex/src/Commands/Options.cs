@@ -23,6 +23,19 @@ public static class Options
         Arity = ArgumentArity.ExactlyOne,
     };
 
+    public static Option<string> Context { get; } = new("--context", "-c")
+    {
+        Description = "The context to run the command in.",
+        Arity = ArgumentArity.ExactlyOne,
+        DefaultValueFactory = _ => "default",
+    };
+
+    public static Argument<string?> Service { get; } = new("service")
+    {
+        Description = "The service to run.",
+        Arity = ArgumentArity.ZeroOrOne,
+    };
+
     public static Argument<string[]> Targets { get; } = new("targets")
     {
         Description = "The targets to run.",

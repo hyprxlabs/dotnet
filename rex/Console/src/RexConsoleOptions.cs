@@ -1,3 +1,4 @@
+using Hyprx.Collections.Generic;
 using Hyprx.Rex.Collections;
 using Hyprx.Rex.Deployments;
 using Hyprx.Rex.Jobs;

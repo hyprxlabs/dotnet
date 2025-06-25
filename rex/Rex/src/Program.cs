@@ -12,11 +12,30 @@ if (!string.IsNullOrEmpty(cwd))
     Environment.CurrentDirectory = cwd;
 }
 
-// rex list
-var listAllCommand = new Command("list", "List all available tasks and jobs in the rexfile or project.")
+var listNamespacesCommand = new SubCommand("namespaces", "List all namespaces in the rexfile or project.")
 {
     Options.File,
     Options.Verbose,
+};
+
+listNamespacesCommand.Aliases.Add("ns");
+listNamespacesCommand.SetAction(Handlers.ListNamespacesAction());
+
+var listServicesCommand = new SubCommand("services", "List all services in the rexfile or project.")
+{
+    Options.File,
+    Options.Verbose,
+};
+
+listServicesCommand.SetAction(Handlers.ListServicesAction());
+
+// rex list
+var listAllCommand = new SubCommand("list", "List all available tasks and jobs in the rexfile or project.")
+{
+    Options.File,
+    Options.Verbose,
+    listNamespacesCommand,
+    listServicesCommand,
 };
 
 listAllCommand.SetAction(Handlers.ListAllAction());
@@ -31,8 +50,9 @@ var taskListCommand = new SubCommand("list", "List available tasks.")
 taskListCommand.SetAction(Handlers.ListTasksAction());
 
 // rex tasks run many build clean test
-var taskRunManyCommand = new Command("many", "Run all tasks provided in the targets argument.")
+var taskRunManyCommand = new SubCommand("many", "Run all tasks provided in the targets argument.")
 {
+    Options.Context,
     Options.File,
     Options.Timeout,
     Options.Env,
@@ -51,8 +71,9 @@ taskRunManyCommand.SetAction(Handlers.GenerateTargetsAction(() =>
      };
 }));
 
-var taskRunCommand = new Command("run", "Run a single task. A single task may include additional options and arguments.")
+var taskRunCommand = new SubCommand("run", "Run a single task. A single task may include additional options and arguments.")
 {
+    Options.Context,
     Options.File,
     Options.Timeout,
     Options.Env,
@@ -60,6 +81,7 @@ var taskRunCommand = new Command("run", "Run a single task. A single task may in
     Options.SecretFiles,
     Options.Verbose,
     Options.Target,
+    Options.Service,
     taskRunManyCommand,
 };
 
@@ -73,8 +95,9 @@ taskRunCommand.SetAction(Handlers.GenerateTargetAction(() =>
 }));
 
 // rex tasks run "build"
-var tasksCommand = new Command("tasks", "Manage tasks. The tasks subcommand is also a shortcut for 'rex tasks run many <target1> <target2> ...'")
+var tasksCommand = new SubCommand("tasks", "Manage tasks. The tasks subcommand is also a shortcut for 'rex tasks run many <target1> <target2> ...'")
 {
+    Options.Context,
     Options.File,
     Options.Timeout,
     Options.Env,
@@ -95,8 +118,9 @@ tasksCommand.SetAction(Handlers.GenerateTargetsAction(() =>
 }));
 
 // rex jobs run many "build" "clean" "test"
-var jobRunAllCommand = new Command("many", "Run all jobs provided in the targets argument.")
+var jobRunAllCommand = new SubCommand("many", "Run all jobs provided in the targets argument.")
 {
+    Options.Context,
     Options.File,
     Options.Timeout,
     Options.Env,
@@ -114,8 +138,9 @@ jobRunAllCommand.SetAction(Handlers.GenerateTargetsAction(() =>
      };
 }));
 
-var jobRunCommand = new Command("run", "Run a specific job.")
+var jobRunCommand = new SubCommand("run", "Run a specific job.")
 {
+    Options.Context,
     Options.File,
     Options.Timeout,
     Options.Env,
@@ -123,6 +148,7 @@ var jobRunCommand = new Command("run", "Run a specific job.")
     Options.SecretFiles,
     Options.Verbose,
     Options.Target,
+    Options.Service,
     jobRunAllCommand,
 };
 
@@ -135,7 +161,7 @@ jobRunCommand.SetAction(Handlers.GenerateTargetAction(() =>
      };
 }));
 
-var jobListCommand = new Command("list", "List all available jobs.")
+var jobListCommand = new SubCommand("list", "List all available jobs.")
 {
     Options.File,
     Options.Verbose,
@@ -143,14 +169,16 @@ var jobListCommand = new Command("list", "List all available jobs.")
 
 jobListCommand.SetAction(Handlers.ListJobsAction());
 
-var jobsCommand = new Command("jobs", "Manage jobs. By default this will run multiple jobs")
+var jobsCommand = new SubCommand("jobs", "Manage jobs. By default this will run multiple jobs")
 {
+    Options.Context,
     Options.File,
     Options.Timeout,
     Options.Env,
     Options.EnvFiles,
     Options.SecretFiles,
     Options.Verbose,
+    Options.Targets,
     jobRunCommand,
     jobListCommand,
 };
@@ -165,8 +193,9 @@ jobsCommand.SetAction(Handlers.GenerateTargetsAction(() =>
 }));
 
 // rex run many "build" "clean" "test"
-var runManyCommand = new Command("many", "Run multiple targets. If the first target is a job, it will run all jobs. If the first target is a task, it will run all tasks.")
+var runManyCommand = new SubCommand("many", "Run multiple targets. If the first target is a job, it will run all jobs. If the first target is a task, it will run all tasks.")
 {
+    Options.Context,
     Options.File,
     Options.Timeout,
     Options.Env,
@@ -186,8 +215,9 @@ runManyCommand.SetAction(Handlers.GenerateTargetsAction(() =>
      };
 }));
 
-var runCommand = new Command("run", "Run a target, task or job.")
+var runCommand = new SubCommand("run", "Run a target, task or job.")
 {
+    Options.Context,
     Options.File,
     Options.Timeout,
     Options.Env,
@@ -195,6 +225,7 @@ var runCommand = new Command("run", "Run a target, task or job.")
     Options.SecretFiles,
     Options.Verbose,
     Options.Target,
+    Options.Service,
     runManyCommand,
 };
 
@@ -207,8 +238,10 @@ runCommand.SetAction(Handlers.GenerateTargetAction(() =>
      };
 }));
 
-var buildCommand = new Command("build", "Invokes the build job or task. This is a shortcut for 'rex run build` ")
+var buildCommand = new SubCommand("build", "Invokes the build job or task. This is a shortcut for 'rex run build` ")
 {
+    Options.Service,
+    Options.Context,
     Options.File,
     Options.Timeout,
     Options.Env,
@@ -216,10 +249,12 @@ var buildCommand = new Command("build", "Invokes the build job or task. This is 
     Options.SecretFiles,
     Options.Verbose,
 };
-buildCommand.SetAction(Handlers.GenerateAutoAction("--build"));
+buildCommand.SetAction(Handlers.GenerateAutoAction("build"));
 
-var cleanCommand = new Command("clean", "Invokes the clean job or task. This is a shortcut for 'rex run clean` ")
+var cleanCommand = new SubCommand("clean", "Invokes the clean job or task. This is a shortcut for 'rex run clean` ")
 {
+    Options.Service,
+    Options.Context,
     Options.File,
     Options.Timeout,
     Options.Env,
@@ -227,10 +262,12 @@ var cleanCommand = new Command("clean", "Invokes the clean job or task. This is 
     Options.SecretFiles,
     Options.Verbose,
 };
-cleanCommand.SetAction(Handlers.GenerateAutoAction("--clean"));
+cleanCommand.SetAction(Handlers.GenerateAutoAction("clean"));
 
-var testCommand = new Command("test", "Runs tests. This is a shortcut for 'rex run test` ")
+var testCommand = new SubCommand("test", "Runs tests. This is a shortcut for 'rex run test` ")
 {
+    Options.Service,
+    Options.Context,
     Options.File,
     Options.Timeout,
     Options.Env,
@@ -240,11 +277,13 @@ var testCommand = new Command("test", "Runs tests. This is a shortcut for 'rex r
 };
 
 testCommand.TreatUnmatchedTokensAsErrors = false;
-testCommand.SetAction(Handlers.GenerateAutoAction("--test"));
+testCommand.SetAction(Handlers.GenerateAutoAction("test"));
 
-var pack = new Command("pack", "Packages a library or application. This is a shortcut for 'rex run pack` ")
+var pack = new SubCommand("pack", "Packages a library or application. This is a shortcut for 'rex run pack` ")
 {
+    Options.Service,
     Options.File,
+    Options.Context,
     Options.Timeout,
     Options.Env,
     Options.EnvFiles,
@@ -253,10 +292,12 @@ var pack = new Command("pack", "Packages a library or application. This is a sho
 };
 
 pack.TreatUnmatchedTokensAsErrors = false;
-pack.SetAction(Handlers.GenerateAutoAction("--pack"));
+pack.SetAction(Handlers.GenerateAutoAction("pack"));
 
-var publishCommand = new Command("publish", "Invokes the publish job or task. This is a shortcut for 'rex run publish` ")
+var publishCommand = new SubCommand("publish", "Invokes the publish job or task. This is a shortcut for 'rex run publish` ")
 {
+    Options.Service,
+    Options.Context,
     Options.File,
     Options.Timeout,
     Options.Env,
@@ -265,10 +306,12 @@ var publishCommand = new Command("publish", "Invokes the publish job or task. Th
     Options.Verbose,
 };
 publishCommand.TreatUnmatchedTokensAsErrors = false;
-publishCommand.SetAction(Handlers.GenerateAutoAction("--publish"));
+publishCommand.SetAction(Handlers.GenerateAutoAction("publish"));
 
-var upCommand = new Command("up", "Deploys or spins up infrastructure. This is a shortcut for 'rex run up` ")
+var upCommand = new SubCommand("up", "Deploys or spins up infrastructure. This is a shortcut for 'rex run up` ")
 {
+    Options.Service,
+    Options.Context,
     Options.File,
     Options.Timeout,
     Options.Env,
@@ -277,11 +320,13 @@ var upCommand = new Command("up", "Deploys or spins up infrastructure. This is a
     Options.Verbose,
 };
 upCommand.TreatUnmatchedTokensAsErrors = false;
-upCommand.SetAction(Handlers.GenerateAutoAction("--up"));
+upCommand.SetAction(Handlers.GenerateAutoAction("up"));
 
-var downCommand = new Command("down", "Spins down infrastructure or removes an application from deployment. This is a shortcut for 'rex run down` ")
+var downCommand = new SubCommand("down", "Spins down infrastructure or removes an application from deployment. This is a shortcut for 'rex run down` ")
 {
+    Options.Service,
     Options.File,
+    Options.Context,
     Options.Timeout,
     Options.Env,
     Options.EnvFiles,
@@ -289,10 +334,12 @@ var downCommand = new Command("down", "Spins down infrastructure or removes an a
     Options.Verbose,
 };
 downCommand.TreatUnmatchedTokensAsErrors = false;
-downCommand.SetAction(Handlers.GenerateAutoAction("--down"));
+downCommand.SetAction(Handlers.GenerateAutoAction("down"));
 
-var rollback = new Command("rollback", "Rolls back the last deployment. This is a shortcut for 'rex run rollback` ")
+var rollback = new SubCommand("rollback", "Rolls back the last deployment. This is a shortcut for 'rex run rollback` ")
 {
+    Options.Service,
+    Options.Context,
     Options.File,
     Options.Timeout,
     Options.Env,
@@ -301,28 +348,41 @@ var rollback = new Command("rollback", "Rolls back the last deployment. This is 
     Options.Verbose,
 };
 rollback.TreatUnmatchedTokensAsErrors = false;
-rollback.SetAction(Handlers.GenerateAutoAction("--rollback"));
+rollback.SetAction(Handlers.GenerateAutoAction("rollback"));
 
 var rootCommand = new RootCommand("rex is a task runner")
 {
     Options.File,
+    Options.Context,
     Options.Timeout,
     Options.Env,
     Options.EnvFiles,
     Options.SecretFiles,
     Options.Verbose,
+    Options.Target,
+    Options.Service,
     listAllCommand,
-    taskRunCommand,
-    taskRunManyCommand,
     tasksCommand,
-    jobRunCommand,
-    jobRunAllCommand,
     jobsCommand,
-    jobListCommand,
     runCommand,
     buildCommand,
     cleanCommand,
+    testCommand,
+    pack,
+    publishCommand,
+    upCommand,
+    downCommand,
+    rollback,
 };
+
+rootCommand.TreatUnmatchedTokensAsErrors = false;
+rootCommand.SetAction(Handlers.GenerateTargetAction(() =>
+{
+    return new Hyprx.Exec.CommandArgs
+     {
+         "--auto",
+     };
+}));
 
 var result = rootCommand.Parse(args);
 

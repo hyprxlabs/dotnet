@@ -1,6 +1,7 @@
 using System.Reflection.Metadata;
 using System.Runtime.InteropServices;
 
+using Hyprx.Collections.Generic;
 using Hyprx.DotEnv.Documents;
 using Hyprx.Extras;
 using Hyprx.Lodi;
@@ -20,76 +21,73 @@ namespace Hyprx;
 
 public static class RexConsole
 {
+    private static readonly Map<bool> s_namespaces = new();
+
+    private static string s_namespace = "default";
+
     public static TaskMap Tasks { get; } = TaskMap.Global;
 
     public static JobMap Jobs { get; } = JobMap.Global;
 
     public static DeploymentMap Deployments { get; } = DeploymentMap.Default;
 
-    public static DeploymentBuilder Deployment(CodeDeployment deployment, Action<DeploymentBuilder>? configure = null)
+    public static void UseNamespace(string ns, Action configure)
     {
-        Deployments[deployment.Id] = deployment;
-        var builder = new DeploymentBuilder(deployment, Tasks);
-        configure?.Invoke(builder);
-        return builder;
+        UseNamespace(ns, false, configure);
     }
 
-    public static DeploymentBuilder Deployment(string id, Func<DeploymentContext, CancellationToken, Task<Result<Outputs>>> deployAsync, Action<DeploymentBuilder>? configure = null)
+    public static void UseNamespace(string ns, bool isService, Action configure)
     {
-        var deployment = new DelegateDeployment(id, deployAsync);
-        Deployments[id] = deployment;
-        var builder = new DeploymentBuilder(deployment, Tasks);
-        configure?.Invoke(builder);
-        return builder;
-    }
+        var old = s_namespace;
+        if (!s_namespaces.ContainsKey(ns))
+        {
+            s_namespaces.Add(ns, isService);
+        }
 
-    public static DeploymentBuilder Deployment(string id, Func<DeploymentContext, Task<Result<Outputs>>> run, Action<DeploymentBuilder>? configure = null)
-    {
-        var deployment = new DelegateDeployment(id, run);
-        Deployments[id] = deployment;
-        var builder = new DeploymentBuilder(deployment, Tasks);
-        configure?.Invoke(builder);
-        return builder;
-    }
+        s_namespace = ns;
+        configure?.Invoke();
+        var jobs = new List<string>();
+        var tasks = new List<string>();
+        foreach (var (key, job) in Jobs)
+        {
+            if (key.StartsWith(ns + ":"))
+                jobs.Add(key);
+        }
 
-    public static DeploymentBuilder Deployment(string id, Func<DeploymentContext, CancellationToken, Outputs> run, Action<DeploymentBuilder>? configure = null)
-    {
-        var deployment = new DelegateDeployment(id, run);
-        Deployments[id] = deployment;
-        var builder = new DeploymentBuilder(deployment, Tasks);
-        configure?.Invoke(builder);
-        return builder;
-    }
+        foreach (var (key, task) in Tasks)
+        {
+            if (key.StartsWith(ns + ":"))
+                tasks.Add(key);
+        }
 
-    public static DeploymentBuilder Deployment(string id, Func<DeploymentContext, CancellationToken, Task<Outputs>> run, Action<DeploymentBuilder>? configure = null)
-    {
-        var deployment = new DelegateDeployment(id, run);
-        Deployments[id] = deployment;
-        var builder = new DeploymentBuilder(deployment, Tasks);
-        configure?.Invoke(builder);
-        return builder;
-    }
+        if (isService)
+        {
+            s_namespace = old;
+            return;
+        }
 
-    public static DeploymentBuilder Deployment(string id, Action<DeploymentContext> run, Action<DeploymentBuilder>? configure = null)
-    {
-        var deployment = new DelegateDeployment(id, run);
-        Deployments[id] = deployment;
-        var builder = new DeploymentBuilder(deployment, Tasks);
-        configure?.Invoke(builder);
-        return builder;
-    }
+        if (jobs.Count > 0)
+        {
+            var job = new CodeJob(ns);
+            job.Needs = jobs.ToArray();
+            Jobs[ns] = job;
+        }
 
-    public static DeploymentBuilder Deployment(string id, Action run, Action<DeploymentBuilder>? configure = null)
-    {
-        var deployment = new DelegateDeployment(id, run);
-        Deployments[id] = deployment;
-        var builder = new DeploymentBuilder(deployment, Tasks);
-        configure?.Invoke(builder);
-        return builder;
+        if (tasks.Count > 0)
+        {
+            var task = new DelegateTask(ns, () => { });
+            task.Needs = tasks.ToArray();
+            Tasks[ns] = task;
+        }
+
+        s_namespace = old;
     }
 
     public static JobBuilder Job(CodeJob job, Action<JobBuilder>? configure = null)
     {
+        if (s_namespace != "default")
+            job.Id = $"{s_namespace}:{job.Id}";
+
         Jobs[job.Id] = job;
         var builder = new JobBuilder(job, Tasks);
         configure?.Invoke(builder);
@@ -98,6 +96,9 @@ public static class RexConsole
 
     public static JobBuilder Job(string id, Action<JobBuilder>? configure = null)
     {
+        if (s_namespace != "default")
+            id = $"{s_namespace}:{id}";
+
         var job = new CodeJob(id);
         Jobs[id] = job;
         var builder = new JobBuilder(job, Tasks);
@@ -107,12 +108,18 @@ public static class RexConsole
 
     public static TaskBuilder Task(CodeTask task)
     {
+        if (s_namespace != "default")
+            task.Id = $"{s_namespace}:{task.Id}";
+
         Tasks[task.Id] = task;
         return new TaskBuilder(task);
     }
 
     public static TaskBuilder Task(string id, RunTaskAsync run, Action<TaskBuilder>? configure = null)
     {
+        if (s_namespace != "default")
+            id = $"{s_namespace}:{id}";
+
         var task = new DelegateTask(id, run);
         Tasks[id] = task;
         var builder = new TaskBuilder(task);
@@ -122,6 +129,9 @@ public static class RexConsole
 
     public static TaskBuilder Task(string id, string[] needs, RunTaskAsync run, Action<TaskBuilder>? configure = null)
     {
+        if (s_namespace != "default")
+            id = $"{s_namespace}:{id}";
+
         var task = new DelegateTask(id, run);
         task.Needs = needs;
         Tasks[id] = task;
@@ -132,6 +142,9 @@ public static class RexConsole
 
     public static TaskBuilder Task(string id, Func<TaskContext, Task<Result<Outputs>>> run, Action<TaskBuilder>? configure = null)
     {
+        if (s_namespace != "default")
+            id = $"{s_namespace}:{id}";
+
         var task = new DelegateTask(id, run);
         Tasks[id] = task;
         var builder = new TaskBuilder(task);
@@ -141,6 +154,9 @@ public static class RexConsole
 
     public static TaskBuilder Task(string id, Func<TaskContext, CancellationToken, Outputs> run, Action<TaskBuilder>? configure = null)
     {
+        if (s_namespace != "default")
+            id = $"{s_namespace}:{id}";
+
         var task = new DelegateTask(id, run);
         Tasks[id] = task;
         var builder = new TaskBuilder(task);
@@ -150,6 +166,9 @@ public static class RexConsole
 
     public static TaskBuilder Task(string id, string[] needs, Func<TaskContext, CancellationToken, Task<Outputs>> run, Action<TaskBuilder>? configure = null)
     {
+        if (s_namespace != "default")
+            id = $"{s_namespace}:{id}";
+
         var task = new DelegateTask(id, run);
         task.Needs = needs;
         Tasks[id] = task;
@@ -160,6 +179,9 @@ public static class RexConsole
 
     public static TaskBuilder Task(string id, Action<TaskContext> run, Action<TaskBuilder>? configure = null)
     {
+        if (s_namespace != "default")
+            id = $"{s_namespace}:{id}";
+
         var task = new DelegateTask(id, run);
         Tasks[id] = task;
         var builder = new TaskBuilder(task);
@@ -169,6 +191,9 @@ public static class RexConsole
 
     public static TaskBuilder Task(string id, Action run, Action<TaskBuilder>? configure = null)
     {
+        if (s_namespace != "default")
+            id = $"{s_namespace}:{id}";
+
         var task = new DelegateTask(id, run);
         Tasks[id] = task;
         var builder = new TaskBuilder(task);
@@ -196,6 +221,7 @@ public static class RexConsole
 
     public static async Task<int> RunTasksAsync(string[] args, RexConsoleOptions options, RexConsoleSettings settings, CancellationToken cancellationToken = default)
     {
+        AnsiSettings.Current.Mode = AnsiMode.TwentyFourBit;
         ArgumentNullException.ThrowIfNull(options, nameof(options));
 
         ParseArgs(args, options);
@@ -358,32 +384,22 @@ public static class RexConsole
 
             case "task":
                 {
-                    settings.Tasks.TryGetValue(options.Targets[0], out var task);
-                    if (task is null)
+                    var ctx = new SequentialTasksPipelineContext(runContext, [options.Targets[0]], settings.Tasks);
+                    var pipeline = serviceProvider.GetService(typeof(SequentialTasksPipeline)) as SequentialTasksPipeline ?? new SequentialTasksPipeline();
+                    var summary = await pipeline!.RunAsync(ctx, cancellationToken);
+                    if (summary.Exception is not null)
                     {
-                        Console.WriteLine($"Task '{Blue(options.Targets[0])}' is '{Red("not found.")}'");
+                        Console.WriteLine($"Task execution failed: {summary.Exception}");
                         return 1;
                     }
 
-                    var ctx = new TaskPipelineContext(new BusContext(runContext), task, new CodeTaskData(task.Id));
-                    var pipeline = serviceProvider.GetService(typeof(TaskPipeline)) as TaskPipeline ?? new TaskPipeline();
-                    var summary = await pipeline!.RunAsync(ctx, cancellationToken);
-                    switch (summary.Status)
+                    if (summary.Status == RunStatus.Failed)
                     {
-                        case RunStatus.Skipped:
-                            return 0;
-
-                        case RunStatus.Cancelled:
-                            Console.WriteLine($"Task '{Blue(task.Id)}' was cancelled.");
-                            return 1;
-
-                        case RunStatus.Failed:
-                            Console.WriteLine(Red($"Task '{Blue(task.Id)}' failed: {summary.Error?.ToString() ?? "Unknown error"}"));
-                            return 1;
-
-                        default:
-                            return 0;
+                        Console.WriteLine("One or more tasks failed.");
+                        return 1;
                     }
+
+                    return 0;
                 }
 
             case "jobs":
@@ -408,32 +424,22 @@ public static class RexConsole
 
             case "job":
                 {
-                    settings.Jobs.TryGetValue(options.Targets[0], out var job);
-                    if (job is null)
+                    var ctx = new JobsPipelineContext(runContext, [options.Targets[0]], settings.Jobs);
+                    var pipeline = serviceProvider.GetService(typeof(SequentialJobsPipeline)) as SequentialJobsPipeline;
+                    var summary = await pipeline!.RunAsync(ctx, cancellationToken);
+                    if (summary.Exception is not null)
                     {
-                        Console.WriteLine($"Job '{Blue(options.Targets[0])}' is '{Red("not found.")}'");
+                        Console.WriteLine($"Job execution failed: {summary.Exception.Message} \n{summary.Exception.StackTrace}");
                         return 1;
                     }
 
-                    var ctx = new JobPipelineContext(new BusContext(runContext), job, new CodeJobData() { Id = job.Id });
-                    var pipeline = serviceProvider.GetService(typeof(JobPipeline)) as JobPipeline ?? new JobPipeline();
-                    var summary = await pipeline!.RunAsync(ctx, cancellationToken);
-                    switch (summary.Status)
+                    if (summary.Status == RunStatus.Failed)
                     {
-                        case RunStatus.Skipped:
-                            return 0;
-
-                        case RunStatus.Cancelled:
-                            Console.WriteLine($"Job '{Blue(job.Id)}' was cancelled.");
-                            return 1;
-
-                        case RunStatus.Failed:
-                            Console.WriteLine(Red($"Job '{Blue(job.Id)}' failed: {summary.Error?.ToString() ?? "Unknown error"}"));
-                            return 1;
-
-                        default:
-                            return 0;
+                        Console.WriteLine("One or more jobs failed.");
+                        return 1;
                     }
+
+                    return 0;
                 }
 
             case "help":
@@ -472,6 +478,43 @@ public static class RexConsole
                         --verbose, -v          Enable verbose output.
                     """;
                     Console.WriteLine(help);
+                    return 0;
+                }
+
+            case "list-namespaces":
+                {
+                    if (s_namespaces.Count == 0)
+                    {
+                        Console.WriteLine("No namespaces defined.");
+                        return 0;
+                    }
+
+                    Console.WriteLine("NAMESPACES:");
+                    foreach (var (ns, _) in s_namespaces)
+                    {
+                        Console.WriteLine($"  {Ansi.Blue(ns)}");
+                    }
+
+                    return 0;
+                }
+
+            case "list-services":
+                {
+                    if (settings.Services is null)
+                    {
+                        Console.WriteLine("No services defined.");
+                        return 0;
+                    }
+
+                    Console.WriteLine("SERVICES:");
+                    foreach (var (ns, svc) in s_namespaces)
+                    {
+                        if (!svc)
+                            continue;
+
+                        Console.WriteLine($"  {Ansi.Blue(ns)}");
+                    }
+
                     return 0;
                 }
 
@@ -523,7 +566,6 @@ public static class RexConsole
         var hasTarget = false;
 
         var isList = Array.IndexOf(args, "--list") >= 0 || Array.IndexOf(args, "-l") >= 0;
-        var hasCommand = false;
         var isRemaining = false;
 
         if (args.Length == 1)
@@ -536,252 +578,247 @@ public static class RexConsole
         }
 
         for (var i = 0; i < args.Length; i++)
+        {
+            var current = args[i];
+            if (current.Length == 0)
             {
-                var current = args[i];
-                if (current.Length == 0)
+                continue;
+            }
+
+            if (current.IsNullOrWhiteSpace())
+                continue;
+
+            if (isRemaining)
+            {
+                additionalArgs.Add(current);
+                continue;
+            }
+
+            var c = current[0];
+
+            if (!hasTarget && c is not '-')
+            {
+                targets.Add(current);
+
+                if (many)
                 {
-                    continue;
+                    var j = i + 1;
+                    while (j < args.Length && args[j].Length > 0 && args[j][0] is not '-')
+                    {
+                        targets.Add(args[j]);
+                        j++;
+                    }
                 }
 
-                if (current.IsNullOrWhiteSpace())
-                    continue;
+                hasTarget = true;
+            }
 
-                if (isRemaining)
-                {
-                    additionalArgs.Add(current);
-                    continue;
-                }
+            if (current.Length == 2 && c is '-' && current[1] is '-')
+            {
+                isRemaining = true;
+                continue;
+            }
 
-                var c = current[0];
+            if (c is not '-')
+            {
+                additionalArgs.Add(current);
+                continue;
+            }
 
-                if (!hasTarget && c is not '-')
-                {
-                    targets.Add(current);
-
-                    if (many)
+            switch (current)
+            {
+                case "--context":
+                case "-c":
                     {
                         var j = i + 1;
-                        while (j < args.Length && args[j].Length > 0 && args[j][0] is not '-')
+                        var next = j < args.Length ? args[j] : null;
+                        if (next is null)
                         {
-                            targets.Add(args[j]);
-                            j++;
+                            Console.WriteLine("--context is missing name.");
                         }
-                    }
-
-                    hasTarget = true;
-                }
-
-                if (current.Length == 2 && c is '-' && current[1] is '-')
-                {
-                    isRemaining = true;
-                    continue;
-                }
-
-                if (c is not '-')
-                {
-                    additionalArgs.Add(current);
-                    continue;
-                }
-
-                switch (current)
-                {
-                    case "--clean":
-                    case "--build":
-                    case "--test":
-                    case "--restore":
-                    case "--pack":
-                    case "--publish":
-                    case "--up":
-                    case "--down":
-                    case "--rollback":
+                        else if (next[0] is '-' or '/')
                         {
-
-                            if (isList)
-                                continue;
-
-                            var target = current[2..];
-
-                            if (hasCommand)
-                            {
-                                var t = targets.FirstOrDefault();
-                                if (t is not null && t != target)
-                                {
-                                    Console.WriteLine(Yellow($"Command '{options.Cmd}' is already set. {current} will be ignored."));
-                                    continue;
-                                }
-                            }
-
-                            hasCommand = true;
-                            options.Cmd = "auto";
-                            if (targets.Count == 0 || !targets.Contains(options.Cmd))
-                            {
-                                targets.Add(options.Cmd);
-                                hasTarget = true;
-                            }
-                        }
-
-                        break;
-
-                    case "--many":
-                        if (isList)
-                            continue;
-
-                        many = true;
-                        options.Cmd = "auto";
-                        break;
-                    case "--auto":
-                        options.Cmd = "auto";
-                        break;
-
-                    case "--tasks":
-                        if (isList)
-                            continue;
-
-                        many = true;
-                        options.Cmd = "tasks";
-                        break;
-
-                    case "--task":
-                    case "-T":
-                        if (isList)
-                            continue;
-
-                        many = false;
-                        options.Cmd = "task";
-                        break;
-
-                    case "--job":
-                    case "-J":
-                        if (isList)
-                            continue;
-
-                        many = false;
-                        options.Cmd = "job";
-                        break;
-                    case "--jobs":
-                        if (isList)
-                            continue;
-
-                        many = true;
-                        options.Cmd = "jobs";
-                        break;
-
-                    case "--list":
-                    case "-l":
-                        options.Cmd = "list";
-                        var listArgs = new List<string>();
-                        if (Array.IndexOf(args, "--tasks") >= 0 || Array.IndexOf(args, "--task") >= 0)
-                        {
-                            listArgs.Add("tasks");
-                        }
-
-                        if (Array.IndexOf(args, "--jobs") >= 0 || Array.IndexOf(args, "--job") >= 0)
-                        {
-                            listArgs.Add("jobs");
-                        }
-
-                        options.ListTargets = listArgs.ToArray();
-                        break;
-
-                    case "--dry-run":
-                    case "--what-if":
-                    case "-w":
-                        options.DryRun = true;
-                        break;
-
-                    case "--verbose":
-                    case "-v":
-                        options.Verbose = true;
-                        break;
-
-                    case "--debug":
-                    case "-d":
-                        options.Debug = true;
-                        break;
-
-                    case "--timeout":
-                    case "-t":
-                        if (i + 1 < args.Length && int.TryParse(args[i + 1], out var timeout))
-                        {
-                            options.Timeout = timeout;
-                            i++;
+                            Console.WriteLine("--context is missing name.");
                         }
                         else
                         {
-                            Console.WriteLine("Timeout value is missing or invalid.");
+                            options.Context = next;
+                            i++;
                         }
+                    }
 
-                        break;
-                    case "--env-file":
-                    case "-E":
+                    break;
+
+                case "--many":
+                    if (isList)
+                        continue;
+
+                    many = true;
+                    options.Cmd = "auto";
+                    break;
+                case "--auto":
+                    options.Cmd = "auto";
+                    break;
+
+                case "--tasks":
+                    if (isList)
+                        continue;
+
+                    many = true;
+                    options.Cmd = "tasks";
+                    break;
+
+                case "--task":
+                case "-T":
+                    if (isList)
+                        continue;
+
+                    many = false;
+                    options.Cmd = "task";
+                    break;
+
+                case "--job":
+                case "-J":
+                    if (isList)
+                        continue;
+
+                    many = false;
+                    options.Cmd = "job";
+                    break;
+                case "--jobs":
+                    if (isList)
+                        continue;
+
+                    many = true;
+                    options.Cmd = "jobs";
+                    break;
+
+                case "--list-namespaces":
+                    options.Cmd = "list-namespaces";
+                    isList = true;
+                    break;
+
+                case "--list-services":
+                    options.Cmd = "list-services";
+                    isList = true;
+                    break;
+
+                case "--list":
+                case "-l":
+                    options.Cmd = "list";
+                    var listArgs = new List<string>();
+                    if (Array.IndexOf(args, "--tasks") >= 0 || Array.IndexOf(args, "--task") >= 0)
+                    {
+                        listArgs.Add("tasks");
+                    }
+
+                    if (Array.IndexOf(args, "--jobs") >= 0 || Array.IndexOf(args, "--job") >= 0)
+                    {
+                        listArgs.Add("jobs");
+                    }
+
+                    options.ListTargets = listArgs.Count > 0 ? listArgs.ToArray() : ["tasks", "jobs"];
+                    break;
+
+                case "--dry-run":
+                case "--what-if":
+                case "-w":
+                    options.DryRun = true;
+                    break;
+
+                case "--verbose":
+                case "-v":
+                    options.Verbose = true;
+                    break;
+
+                case "--debug":
+                case "-d":
+                    options.Debug = true;
+                    break;
+
+                case "--timeout":
+                case "-t":
+                    if (i + 1 < args.Length && int.TryParse(args[i + 1], out var timeout))
+                    {
+                        options.Timeout = timeout;
+                        i++;
+                    }
+                    else
+                    {
+                        Console.WriteLine("Timeout value is missing or invalid.");
+                    }
+
+                    break;
+                case "--env-file":
+                case "-E":
+                    {
+                        var j = i + 1;
+                        var next = j < args.Length ? args[j] : null;
+                        if (next is null)
                         {
-                            var j = i + 1;
-                            var next = j < args.Length ? args[j] : null;
-                            if (next is null)
+                            Console.WriteLine("--env-file is missing path.");
+                        }
+                        else if (next[0] is '-' or '/')
+                        {
+                            Console.WriteLine("--env-file is missing path.");
+                        }
+                        else
+                        {
+                            options.EnvFiles.Add(next);
+                            i++;
+                        }
+                    }
+
+                    break;
+
+                case "--env":
+                case "-e":
+                    {
+                        var j = i + 1;
+                        var next = j < args.Length ? args[j] : null;
+                        if (next is null)
+                        {
+                            Console.WriteLine("--env is missing key=value.");
+                        }
+                        else if (next[0] is '-' or '/')
+                        {
+                            Console.WriteLine("--env is missing key=value.");
+                        }
+                        else
+                        {
+                            var eq = next.IndexOf('=');
+                            if (eq > 0)
                             {
-                                Console.WriteLine("--env-file is missing path.");
-                            }
-                            else if (next[0] is '-' or '/')
-                            {
-                                Console.WriteLine("--env-file is missing path.");
+                                var key = next.Substring(0, eq);
+                                var value = next.Substring(eq + 1);
+                                if (value[0] is '"' or '\'')
+                                {
+                                    value = value[1..];
+                                }
+
+                                if (value.Length > 0 && value[^1] is '"' or '\'')
+                                {
+                                    value = value[..^1];
+                                }
+
+                                options.Env[key] = value;
                             }
                             else
                             {
-                                options.EnvFiles.Add(next);
-                                i++;
+                                Console.WriteLine("--env is missing '='. e.g. -e key=value.");
                             }
+
+                            i++;
                         }
+                    }
 
-                        break;
+                    break;
 
-                    case "--env":
-                    case "-e":
-                        {
-                            var j = i + 1;
-                            var next = j < args.Length ? args[j] : null;
-                            if (next is null)
-                            {
-                                Console.WriteLine("--env is missing key=value.");
-                            }
-                            else if (next[0] is '-' or '/')
-                            {
-                                Console.WriteLine("--env is missing key=value.");
-                            }
-                            else
-                            {
-                                var eq = next.IndexOf('=');
-                                if (eq > 0)
-                                {
-                                    var key = next.Substring(0, eq);
-                                    var value = next.Substring(eq + 1);
-                                    if (value[0] is '"' or '\'')
-                                    {
-                                        value = value[1..];
-                                    }
-
-                                    if (value.Length > 0 && value[^1] is '"' or '\'')
-                                    {
-                                        value = value[..^1];
-                                    }
-
-                                    options.Env[key] = value;
-                                }
-                                else
-                                {
-                                    Console.WriteLine("--env is missing '='. e.g. -e key=value.");
-                                }
-
-                                i++;
-                            }
-                        }
-
-                        break;
-
-                    default:
-                        additionalArgs.Add(current);
-                        break;
-                }
+                default:
+                    additionalArgs.Add(current);
+                    break;
             }
+        }
 
         options.Targets = targets.Count == 0 ? new[] { "default" } : targets.ToArray();
         options.Args = additionalArgs.ToArray();

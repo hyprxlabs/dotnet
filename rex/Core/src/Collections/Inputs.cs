@@ -1,6 +1,8 @@
+using Hyprx.Collections.Generic;
+
 namespace Hyprx.Rex.Collections;
 
-public class Inputs : KeyMap<object?>
+public class Inputs : Map
 {
     public Inputs()
         : base()
