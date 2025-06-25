@@ -131,9 +131,6 @@ namespace Hyprx.Crypto
             }
         }
 
-        public static KeyedHashAlgorithm CreateKeyedHashAlgorithm(this KeyedHashAlgorithmType type)
-            => CreateKeyedHashAlgorithm(type.ToString());
-
         public static KeyedHashAlgorithm CreateKeyedHashAlgorithm(string keyedHashAlgorithm)
         {
             if (keyedHashAlgorithm is null)

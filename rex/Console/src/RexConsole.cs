@@ -1,7 +1,8 @@
 using System.Reflection.Metadata;
+using System.Runtime.InteropServices;
 
 using Hyprx.DotEnv.Documents;
-
+using Hyprx.Extras;
 using Hyprx.Lodi;
 using Hyprx.Results;
 
@@ -12,6 +13,8 @@ using Hyprx.Rex.Jobs;
 using Hyprx.Rex.Messaging;
 using Hyprx.Rex.Tasks;
 using Hyprx.Secrets;
+
+using static Hyprx.Ansi;
 
 namespace Hyprx;
 
@@ -314,17 +317,13 @@ public static class RexConsole
                 return 1;
             }
 
-            if (globalTasks.ContainsKey(first))
+            if (globalJobs.ContainsKey(first))
             {
-                options.Cmd = "task";
+                options.Cmd = options.Targets.Length > 1 ? "jobs" : "job";
             }
-            else if (globalJobs.ContainsKey(first))
+            else if (globalTasks.ContainsKey(first))
             {
-                options.Cmd = "job";
-            }
-            else if (globalDeployments.ContainsKey(first))
-            {
-                options.Cmd = "deploy";
+                options.Cmd = options.Targets.Length > 1 ? "tasks" : "task";
             }
             else
             {
@@ -333,11 +332,11 @@ public static class RexConsole
             }
         }
 
-        var runContext = new RunContext(options.Context, serviceProvider);
+        var runContext = new RunContext(options.Context, serviceProvider, options.Args);
 
         switch (options.Cmd)
         {
-            case "task":
+            case "tasks":
                 {
                     var ctx = new SequentialTasksPipelineContext(runContext, options.Targets, settings.Tasks);
                     var pipeline = serviceProvider.GetService(typeof(SequentialTasksPipeline)) as SequentialTasksPipeline ?? new SequentialTasksPipeline();
@@ -357,7 +356,37 @@ public static class RexConsole
                     return 0;
                 }
 
-            case "job":
+            case "task":
+                {
+                    settings.Tasks.TryGetValue(options.Targets[0], out var task);
+                    if (task is null)
+                    {
+                        Console.WriteLine($"Task '{Blue(options.Targets[0])}' is '{Red("not found.")}'");
+                        return 1;
+                    }
+
+                    var ctx = new TaskPipelineContext(new BusContext(runContext), task, new CodeTaskData(task.Id));
+                    var pipeline = serviceProvider.GetService(typeof(TaskPipeline)) as TaskPipeline ?? new TaskPipeline();
+                    var summary = await pipeline!.RunAsync(ctx, cancellationToken);
+                    switch (summary.Status)
+                    {
+                        case RunStatus.Skipped:
+                            return 0;
+
+                        case RunStatus.Cancelled:
+                            Console.WriteLine($"Task '{Blue(task.Id)}' was cancelled.");
+                            return 1;
+
+                        case RunStatus.Failed:
+                            Console.WriteLine(Red($"Task '{Blue(task.Id)}' failed: {summary.Error?.ToString() ?? "Unknown error"}"));
+                            return 1;
+
+                        default:
+                            return 0;
+                    }
+                }
+
+            case "jobs":
                 {
                     var ctx = new JobsPipelineContext(runContext, options.Targets, settings.Jobs);
                     var pipeline = serviceProvider.GetService(typeof(SequentialJobsPipeline)) as SequentialJobsPipeline;
@@ -377,49 +406,79 @@ public static class RexConsole
                     return 0;
                 }
 
-            case "deployment":
-            case "deploy":
-            case "destroy":
-            case "rollback":
+            case "job":
                 {
-                    DeploymentAction action = options.DeploymentAction switch
+                    settings.Jobs.TryGetValue(options.Targets[0], out var job);
+                    if (job is null)
                     {
-                        "deploy" => DeploymentAction.Deploy,
-                        "destroy" => DeploymentAction.Destroy,
-                        "rollback" => DeploymentAction.Rollback,
-                        _ => DeploymentAction.Deploy,
-                    };
-
-                    if (options.Targets.Length > 1)
-                    {
-                        Console.WriteLine("Multiple deployment targets are not currently supported.");
+                        Console.WriteLine($"Job '{Blue(options.Targets[0])}' is '{Red("not found.")}'");
                         return 1;
                     }
 
-                    if (!Deployments.TryGetValue(options.Targets[0], out var deployment))
+                    var ctx = new JobPipelineContext(new BusContext(runContext), job, new CodeJobData() { Id = job.Id });
+                    var pipeline = serviceProvider.GetService(typeof(JobPipeline)) as JobPipeline ?? new JobPipeline();
+                    var summary = await pipeline!.RunAsync(ctx, cancellationToken);
+                    switch (summary.Status)
                     {
-                        Console.WriteLine($"Deployment '{options.Targets[0]}' not found.");
-                        return 1;
+                        case RunStatus.Skipped:
+                            return 0;
+
+                        case RunStatus.Cancelled:
+                            Console.WriteLine($"Job '{Blue(job.Id)}' was cancelled.");
+                            return 1;
+
+                        case RunStatus.Failed:
+                            Console.WriteLine(Red($"Job '{Blue(job.Id)}' failed: {summary.Error?.ToString() ?? "Unknown error"}"));
+                            return 1;
+
+                        default:
+                            return 0;
                     }
+                }
 
-                    var data = new CodeDeploymentData(deployment.Id);
-                    data.Action = action;
-                    var ctx = new DeploymentPipelineContext(runContext, deployment, data);
-                    var pipeline = serviceProvider.GetService(typeof(DeploymentPipeline)) as DeploymentPipeline;
-                    var result = await pipeline!.RunAsync(ctx, cancellationToken);
+            case "help":
+                {
+                    var help = """
+                    Version: 0.0.0
 
-                    if (result.Error is not null)
-                    {
-                        return 1;
-                    }
+                    RexConsole is meant to be executed using dotnet-rex command line tool which will
+                    call the appropriate arguments. However, you can also run it directly using
+                    dotnet run command in the root of the project.
 
+                    Usage: 
+                        dotnet run -v quiet rexfile.cs -- [options] <target...> [<remainingArgs>]
+                        dotnet run -v quiet rexfile.cs -- --list 
+                        dotnet run -v quiet rexfile.cs -- rex --list --tasks
+                        dotnet run -v quiet rexfile.cs -- rex --list --jobs
+                        dotnet run -v quiet rexfile.cs -- build customArg --custom-option
+                        dotnet run -v quiet rexfile.cs -- -e MY_VAR=someValue --env-file .env --task myTask
+                        dotnet run -v quiet rexfile.cs -- -v --job myJob 
+                        dotnet run -v quiet rexfile.cs -- -v --jobs myJob1 myJob2
+                        dotnet run -v quiet rexfile.cs -- -v myJob1 myJob2
+                        dotnet run -v quiet rexfile.cs -- -c myContext --auto target1
+
+                    Options:
+                        --auto                 Automatically determine the command based on the target. 
+                        --context, -c <name>   Specify the context to use (default: 'default').
+                        --dry-run, -d          Perform a dry run without executing tasks or jobs.
+                        --env, -e <variable>   Set an environment variable (can be used multiple times). The format is <name>=<value>.
+                        --env-file, -E <file>  Load environment variables from a file (can be used multiple times).
+                        --help, -h             Show this help message.
+                        --job, -J              Indicate that the targets are jobs.
+                        --jobs                 Indicate that the targets are jobs (multiple).
+                        --list, -l <targets>   List available tasks, jobs, or deployments. Targets can be 'tasks' or 'jobs'.
+                        --task, -T             Indicate that the targets are tasks.
+                        --tasks                Indicate that the targets are tasks (multiple).
+                        --verbose, -v          Enable verbose output.
+                    """;
+                    Console.WriteLine(help);
                     return 0;
                 }
 
             case "list":
                 {
                     if (options.ListTargets.Length == 0)
-                        options.ListTargets = ["tasks", "jobs", "deployments"];
+                        options.ListTargets = ["tasks", "jobs"];
 
                     var la = options.ListTargets.ToList();
 
@@ -446,18 +505,6 @@ public static class RexConsole
 
                         Console.WriteLine();
                     }
-
-                    if (la.Contains("deployments") && globalDeployments.Count > 0)
-                    {
-                        Console.WriteLine("DEPLOYMENTS:");
-                        var max = globalDeployments.Keys.Max(k => k.Length);
-                        foreach (var kvp in globalDeployments)
-                        {
-                            Console.WriteLine($"  {Ansi.Blue(kvp.Key.PadRight(max))}   {kvp.Value.Description}");
-                        }
-
-                        Console.WriteLine();
-                    }
                 }
 
                 return 0;
@@ -470,59 +517,153 @@ public static class RexConsole
 
     private static void ParseArgs(string[] args, RexConsoleOptions options)
     {
-        bool isTarget = false;
         var targets = new List<string>();
         var additionalArgs = new List<string>();
+        var many = false;
+        var hasTarget = false;
 
         var isList = Array.IndexOf(args, "--list") >= 0 || Array.IndexOf(args, "-l") >= 0;
+        var hasCommand = false;
+        var isRemaining = false;
+
+        if (args.Length == 1)
+        {
+            if (args[0] == "--help" || args[0] == "-h")
+            {
+                options.Cmd = "help";
+                return;
+            }
+        }
 
         for (var i = 0; i < args.Length; i++)
-        {
-            var current = args[i];
-            if (current.Length == 0)
             {
-                continue;
-            }
+                var current = args[i];
+                if (current.Length == 0)
+                {
+                    continue;
+                }
 
-            if (current[0] is '-' && !isTarget)
-            {
+                if (current.IsNullOrWhiteSpace())
+                    continue;
+
+                if (isRemaining)
+                {
+                    additionalArgs.Add(current);
+                    continue;
+                }
+
+                var c = current[0];
+
+                if (!hasTarget && c is not '-')
+                {
+                    targets.Add(current);
+
+                    if (many)
+                    {
+                        var j = i + 1;
+                        while (j < args.Length && args[j].Length > 0 && args[j][0] is not '-')
+                        {
+                            targets.Add(args[j]);
+                            j++;
+                        }
+                    }
+
+                    hasTarget = true;
+                }
+
+                if (current.Length == 2 && c is '-' && current[1] is '-')
+                {
+                    isRemaining = true;
+                    continue;
+                }
+
+                if (c is not '-')
+                {
+                    additionalArgs.Add(current);
+                    continue;
+                }
+
                 switch (current)
                 {
-                    case "--task":
+                    case "--clean":
+                    case "--build":
+                    case "--test":
+                    case "--restore":
+                    case "--pack":
+                    case "--publish":
+                    case "--up":
+                    case "--down":
+                    case "--rollback":
+                        {
+
+                            if (isList)
+                                continue;
+
+                            var target = current[2..];
+
+                            if (hasCommand)
+                            {
+                                var t = targets.FirstOrDefault();
+                                if (t is not null && t != target)
+                                {
+                                    Console.WriteLine(Yellow($"Command '{options.Cmd}' is already set. {current} will be ignored."));
+                                    continue;
+                                }
+                            }
+
+                            hasCommand = true;
+                            options.Cmd = "auto";
+                            if (targets.Count == 0 || !targets.Contains(options.Cmd))
+                            {
+                                targets.Add(options.Cmd);
+                                hasTarget = true;
+                            }
+                        }
+
+                        break;
+
+                    case "--many":
+                        if (isList)
+                            continue;
+
+                        many = true;
+                        options.Cmd = "auto";
+                        break;
+                    case "--auto":
+                        options.Cmd = "auto";
+                        break;
+
                     case "--tasks":
                         if (isList)
                             continue;
 
+                        many = true;
+                        options.Cmd = "tasks";
+                        break;
+
+                    case "--task":
+                    case "-T":
+                        if (isList)
+                            continue;
+
+                        many = false;
                         options.Cmd = "task";
                         break;
 
                     case "--job":
+                    case "-J":
+                        if (isList)
+                            continue;
+
+                        many = false;
+                        options.Cmd = "job";
+                        break;
                     case "--jobs":
                         if (isList)
                             continue;
 
-                        options.Cmd = "job";
-                        break;
-
-                    case "--deploy":
-                        if (isList)
-                            continue;
-                        options.Cmd = "deploy";
-                        options.DeploymentAction = "deploy";
-                        break;
-
-                    case "--destroy":
-                        if (isList)
-                            continue;
-                        options.Cmd = "deploy";
-                        options.DeploymentAction = "destroy";
-                        break;
-
-                    case "--rollback":
-                        if (isList)
-                            continue;
-                        options.Cmd = "deploy";
-                        options.DeploymentAction = "rollback";
+                        many = true;
+                        options.Cmd = "jobs";
                         break;
 
                     case "--list":
@@ -537,11 +678,6 @@ public static class RexConsole
                         if (Array.IndexOf(args, "--jobs") >= 0 || Array.IndexOf(args, "--job") >= 0)
                         {
                             listArgs.Add("jobs");
-                        }
-
-                        if (Array.IndexOf(args, "--deployments") >= 0 || Array.IndexOf(args, "--deployment") >= 0)
-                        {
-                            listArgs.Add("deployments");
                         }
 
                         options.ListTargets = listArgs.ToArray();
@@ -577,6 +713,7 @@ public static class RexConsole
 
                         break;
                     case "--env-file":
+                    case "-E":
                         {
                             var j = i + 1;
                             var next = j < args.Length ? args[j] : null;
@@ -640,38 +777,11 @@ public static class RexConsole
 
                         break;
 
-                    case "--":
-                        isTarget = true;
-                        break;
-
                     default:
-                        Console.WriteLine($"Unknown option '{current}'.");
+                        additionalArgs.Add(current);
                         break;
                 }
             }
-            else if (isTarget && current[0] is '-' or '/')
-            {
-                isTarget = true;
-                var j = i;
-                for (; j < args.Length; j++)
-                {
-                    if (args[j] == "--")
-                    {
-                        j++;
-                        continue;
-                    }
-
-                    additionalArgs.Add(args[j]);
-                }
-
-                break;
-            }
-            else
-            {
-                isTarget = true;
-                targets.Add(current);
-            }
-        }
 
         options.Targets = targets.Count == 0 ? new[] { "default" } : targets.ToArray();
         options.Args = additionalArgs.ToArray();

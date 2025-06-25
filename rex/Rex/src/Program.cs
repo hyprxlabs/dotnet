@@ -4,7 +4,7 @@ using System.CommandLine;
 using System.CommandLine.Invocation;
 using System.Diagnostics;
 
-using Rex;
+using Hyprx.Rex.Commands;
 
 var cwd = Environment.GetEnvironmentVariable("REX_PWD");
 if (!string.IsNullOrEmpty(cwd))
@@ -12,665 +12,318 @@ if (!string.IsNullOrEmpty(cwd))
     Environment.CurrentDirectory = cwd;
 }
 
-var fileOption = new Option<FileInfo?>(["--file", "-f"], () => null, "The rexfile.cs or tasks.cs file to use. If not specified, it will look for rexfile.cs or tasks.cs in the current directory.");
-var timeoutOption = new Option<int?>(["--timeout", "-t"], () => null, "The timeout in seconds for each task. If not specified, there is no timeout.");
-var enviroment = new Option<string[]>(["--env", "-e"], () => [], "The environment to use. This will set the REX_ENV environment variable.");
-var environmentFileOption = new Option<FileInfo[]>(["--env-file"], () => [], "The environment file to use. This will set the REX_ENV_FILE environment variable.");
-var secretFileOption = new Option<FileInfo[]>(["--secret-file"], () => [], "The secret file to use. This will set the REX_SECRET_FILE environment variable.");
-var verboseOption = new Option<bool>(["--verbose", "-v"], () => false, "Enable verbose logging.");
-var targetsArgument = new Argument<string[]>("targets", () => Array.Empty<string>(), "The targets to run.");
-var listCommand = new Command("list", "List all available tasks.")
+// rex list
+var listAllCommand = new Command("list", "List all available tasks and jobs in the rexfile or project.")
 {
-    fileOption,
-}
-.WithHandler((ctx) =>
-{
-    var fileInfo = ctx.ParseResult.GetValueForOption(fileOption);
-    var file = fileInfo?.FullName;
-    if (file is null)
-    {
-        file = Project.FindProject(Environment.CurrentDirectory);
-    }
-    else
-    {
-        if (!Path.IsPathFullyQualified(file))
-        {
-            file = Path.GetFullPath(file, Environment.CurrentDirectory);
-        }
-    }
-
-    if (file is null)
-    {
-        Console.WriteLine($"No rexfile.cs, .rex/main.cs or .rex/*.csproj found in the {Environment.CurrentDirectory}.");
-        return 1;
-    }
-
-    if (file.EndsWith(".csproj"))
-    {
-        Process.Start("dotnet", $"run -v quiet --project {file} --list")?.WaitForExit();
-        return 0;
-    }
-
-    if (file.EndsWith(".cs"))
-    {
-        Process.Start("dotnet", $"run -v quiet {file} --list")?.WaitForExit();
-        return 0;
-    }
-
-    if (file.EndsWith(".dll"))
-    {
-        Process.Start("dotnet", $"{file} --list")?.WaitForExit();
-        return 0;
-    }
-
-    return 1;
-});
-
-Func<InvocationContext, int> runTask = (ctx) =>
-{
-    var fileInfo = ctx.ParseResult.GetValueForOption(fileOption);
-    var file = fileInfo?.FullName;
-    if (file is null)
-    {
-        file = Project.FindProject(Environment.CurrentDirectory);
-    }
-    else
-    {
-        if (!Path.IsPathFullyQualified(file))
-        {
-            file = Path.GetFullPath(file, Environment.CurrentDirectory);
-        }
-    }
-
-    if (file is null)
-    {
-        Console.WriteLine($"No rexfile.cs, .rex/main.cs or .rex/*.csproj found in the {Environment.CurrentDirectory}.");
-        return 1;
-    }
-
-    var timeout = ctx.ParseResult.GetValueForOption(timeoutOption);
-    var env = ctx.ParseResult.GetValueForOption(enviroment);
-    var envFiles = ctx.ParseResult.GetValueForOption(environmentFileOption);
-    var secretFile = ctx.ParseResult.GetValueForOption(secretFileOption);
-    var verbose = ctx.ParseResult.GetValueForOption(verboseOption);
-    var targets = ctx.ParseResult.GetValueForArgument<string[]>(targetsArgument);
-
-    var remaining = ctx.ParseResult.UnparsedTokens;
-
-    var args = new List<string>()
-    {
-        "--task",
-    };
-    if (verbose)
-        args.Add("-v");
-    if (timeout.HasValue)
-        args.Add($"-t {timeout.Value}");
-
-    if (env is not null)
-    {
-        foreach (var e in env)
-            args.Add($"-e {e}");
-    }
-
-    if (envFiles is not null)
-    {
-        foreach (var f in envFiles)
-            args.Add($"--env-file {f.FullName}");
-    }
-
-    if (secretFile is not null)
-    {
-        foreach (var f in secretFile)
-            args.Add($"--secret-file {f.FullName}");
-    }
-
-    args.AddRange(targets);
-
-    if (remaining is not null)
-        args.AddRange(remaining);
-
-    if (file.EndsWith(".csproj"))
-    {
-        var p = Process.Start("dotnet", $"run -v quiet --project {file} -- {string.Join(' ', args)}");
-        p?.WaitForExit();
-        return p?.ExitCode ?? 1;
-    }
-
-    if (file.EndsWith(".cs"))
-    {
-        var p = Process.Start("dotnet", $"run -v quiet {file} -- {string.Join(' ', args)}");
-        p?.WaitForExit();
-        return p?.ExitCode ?? 1;
-    }
-
-    if (file.EndsWith(".dll"))
-    {
-        var p = Process.Start("dotnet", $"{file} -- {string.Join(' ', args)}");
-        p?.WaitForExit();
-        return p?.ExitCode ?? 1;
-    }
-
-    return 1;
+    Options.File,
+    Options.Verbose,
 };
 
-var taskCommand = new Command("tasks", "Run a specific task.")
+listAllCommand.SetAction(Handlers.ListAllAction());
+
+// rex tasks list
+var taskListCommand = new SubCommand("list", "List available tasks.")
 {
-    fileOption,
-    timeoutOption,
-    enviroment,
-    environmentFileOption,
-    secretFileOption,
-    verboseOption,
-    targetsArgument,
-}.WithHandler(runTask);
-
-var taskRunCommand = new Command("run", "Run a specific task.")
-{
-    fileOption,
-    timeoutOption,
-    enviroment,
-    environmentFileOption,
-    secretFileOption,
-    verboseOption,
-    targetsArgument,
-}.WithHandler(runTask);
-
-taskCommand.AddCommand(taskRunCommand);
-
-Func<InvocationContext, int> runJobs = (ctx) =>
-{
-    var fileInfo = ctx.ParseResult.GetValueForOption(fileOption);
-    var file = fileInfo?.FullName;
-    if (file is null)
-    {
-        file = Project.FindProject(Environment.CurrentDirectory);
-    }
-    else
-    {
-        if (!Path.IsPathFullyQualified(file))
-        {
-            file = Path.GetFullPath(file, Environment.CurrentDirectory);
-        }
-    }
-
-    if (file is null)
-    {
-        Console.WriteLine($"No rexfile.cs, .rex/main.cs or .rex/*.csproj found in the {Environment.CurrentDirectory}.");
-        return 1;
-    }
-
-    var timeout = ctx.ParseResult.GetValueForOption(timeoutOption);
-    var env = ctx.ParseResult.GetValueForOption(enviroment);
-    var envFiles = ctx.ParseResult.GetValueForOption(environmentFileOption);
-    var secretFile = ctx.ParseResult.GetValueForOption(secretFileOption);
-    var verbose = ctx.ParseResult.GetValueForOption(verboseOption);
-    var targets = ctx.ParseResult.GetValueForArgument<string[]>(targetsArgument);
-
-    var remaining = ctx.ParseResult.UnparsedTokens;
-
-    var args = new List<string>()
-    {
-        "--job",
-    };
-    if (verbose)
-        args.Add("-v");
-    if (timeout.HasValue)
-        args.Add($"-t {timeout.Value}");
-    if (env is not null)
-    {
-        foreach (var e in env)
-            args.Add($"-e {e}");
-    }
-
-    if (envFiles is not null)
-    {
-        foreach (var f in envFiles)
-            args.Add($"--env-file {f.FullName}");
-    }
-
-    if (secretFile is not null)
-    {
-        foreach (var f in secretFile)
-            args.Add($"--secret-file {f.FullName}");
-    }
-
-    args.AddRange(targets);
-
-    if (remaining is not null)
-        args.AddRange(remaining);
-
-    if (file.EndsWith(".csproj"))
-    {
-        var p = Process.Start("dotnet", $"run -v quiet --project {file} -- {string.Join(' ', args)}");
-        p?.WaitForExit();
-        return p?.ExitCode ?? 1;
-    }
-
-    if (file.EndsWith(".cs"))
-    {
-        var p = Process.Start("dotnet", $"run -v quiet {file} -- {string.Join(' ', args)}");
-        p?.WaitForExit();
-        return p?.ExitCode ?? 1;
-    }
-
-    if (file.EndsWith(".dll"))
-    {
-        var p = Process.Start("dotnet", $"{file} -- {string.Join(' ', args)}");
-        p?.WaitForExit();
-        return p?.ExitCode ?? 1;
-    }
-
-    return 1;
+    Options.File,
+    Options.Verbose,
 };
 
-var jobsCommand = new Command("jobs", "Manage background jobs.")
+taskListCommand.SetAction(Handlers.ListTasksAction());
+
+// rex tasks run many build clean test
+var taskRunManyCommand = new Command("many", "Run all tasks provided in the targets argument.")
 {
-    fileOption,
-    timeoutOption,
-    enviroment,
-    environmentFileOption,
-    secretFileOption,
-    verboseOption,
-    targetsArgument,
-}
-.WithHandler(runJobs);
+    Options.File,
+    Options.Timeout,
+    Options.Env,
+    Options.EnvFiles,
+    Options.SecretFiles,
+    Options.Verbose,
+    Options.Targets,
+};
 
-var jobsRunCommand = new Command("run", "Run a specific job.")
+taskRunManyCommand.TreatUnmatchedTokensAsErrors = false;
+taskRunManyCommand.SetAction(Handlers.GenerateTargetsAction(() =>
 {
-    fileOption,
-    timeoutOption,
-    enviroment,
-    environmentFileOption,
-    secretFileOption,
-    verboseOption,
-    targetsArgument,
-}.WithHandler(runJobs);
-jobsCommand.AddCommand(jobsRunCommand);
+    return new Hyprx.Exec.CommandArgs
+     {
+         "--tasks",
+     };
+}));
 
-var deployCommand = new Command("deploy", "Deploy a specific deployment.")
+var taskRunCommand = new Command("run", "Run a single task. A single task may include additional options and arguments.")
 {
-    fileOption,
-    timeoutOption,
-    enviroment,
-    environmentFileOption,
-    secretFileOption,
-    verboseOption,
-    targetsArgument,
-}.WithHandler((ctx) =>
+    Options.File,
+    Options.Timeout,
+    Options.Env,
+    Options.EnvFiles,
+    Options.SecretFiles,
+    Options.Verbose,
+    Options.Target,
+    taskRunManyCommand,
+};
+
+taskRunCommand.TreatUnmatchedTokensAsErrors = false;
+taskRunCommand.SetAction(Handlers.GenerateTargetAction(() =>
 {
-    var fileInfo = ctx.ParseResult.GetValueForOption(fileOption);
-    var file = fileInfo?.FullName;
-    if (file is null)
-    {
-        file = Project.FindProject(Environment.CurrentDirectory);
-    }
-    else
-    {
-        if (!Path.IsPathFullyQualified(file))
-        {
-            file = Path.GetFullPath(file, Environment.CurrentDirectory);
-        }
-    }
+    return new Hyprx.Exec.CommandArgs
+     {
+         "--task",
+     };
+}));
 
-    if (file is null)
-    {
-        Console.WriteLine($"No rexfile.cs, .rex/main.cs or .rex/*.csproj found in the {Environment.CurrentDirectory}.");
-        return 1;
-    }
-
-    var timeout = ctx.ParseResult.GetValueForOption(timeoutOption);
-    var env = ctx.ParseResult.GetValueForOption(enviroment);
-    var envFiles = ctx.ParseResult.GetValueForOption(environmentFileOption);
-    var secretFile = ctx.ParseResult.GetValueForOption(secretFileOption);
-    var verbose = ctx.ParseResult.GetValueForOption(verboseOption);
-    var targets = ctx.ParseResult.GetValueForArgument<string[]>(targetsArgument);
-
-    var remaining = ctx.ParseResult.UnparsedTokens;
-
-    var args = new List<string>()
-    {
-        "--deploy",
-    };
-    if (verbose)
-        args.Add("-v");
-    if (timeout.HasValue)
-        args.Add($"-t {timeout.Value}");
-    if (env is not null)
-    {
-        foreach (var e in env)
-            args.Add($"-e {e}");
-    }
-
-    if (envFiles is not null)
-    {
-        foreach (var f in envFiles)
-            args.Add($"--env-file {f.FullName}");
-    }
-
-    if (secretFile is not null)
-    {
-        foreach (var f in secretFile)
-            args.Add($"--secret-file {f.FullName}");
-    }
-
-    args.AddRange(targets);
-
-    if (remaining is not null)
-        args.AddRange(remaining);
-
-    if (file.EndsWith(".csproj"))
-    {
-        var p = Process.Start("dotnet", $"run -v quiet --project {file} -- {string.Join(' ', args)}");
-        p?.WaitForExit();
-        return p?.ExitCode ?? 1;
-    }
-
-    if (file.EndsWith(".cs"))
-    {
-        var p = Process.Start("dotnet", $"run -v quiet {file} -- {string.Join(' ', args)}");
-        p?.WaitForExit();
-        return p?.ExitCode ?? 1;
-    }
-
-    if (file.EndsWith(".dll"))
-    {
-        var p = Process.Start("dotnet", $"{file} -- {string.Join(' ', args)}");
-        p?.WaitForExit();
-        return p?.ExitCode ?? 1;
-    }
-
-    return 1;
-});
-
-var rollbackCommand = new Command("rollback", "Rollback a specific deployment.")
+// rex tasks run "build"
+var tasksCommand = new Command("tasks", "Manage tasks. The tasks subcommand is also a shortcut for 'rex tasks run many <target1> <target2> ...'")
 {
-    fileOption,
-    timeoutOption,
-    enviroment,
-    environmentFileOption,
-    secretFileOption,
-    verboseOption,
-    targetsArgument,
-}.WithHandler((ctx) =>
+    Options.File,
+    Options.Timeout,
+    Options.Env,
+    Options.EnvFiles,
+    Options.SecretFiles,
+    Options.Verbose,
+    taskRunCommand,
+    taskListCommand,
+};
+
+tasksCommand.TreatUnmatchedTokensAsErrors = false;
+tasksCommand.SetAction(Handlers.GenerateTargetsAction(() =>
 {
-    var fileInfo = ctx.ParseResult.GetValueForOption(fileOption);
-    var file = fileInfo?.FullName;
-    if (file is null)
-    {
-        file = Project.FindProject(Environment.CurrentDirectory);
-    }
-    else
-    {
-        if (!Path.IsPathFullyQualified(file))
-        {
-            file = Path.GetFullPath(file, Environment.CurrentDirectory);
-        }
-    }
+    return new Hyprx.Exec.CommandArgs
+     {
+         "--tasks",
+     };
+}));
 
-    if (file is null)
-    {
-        Console.WriteLine($"No rexfile.cs, .rex/main.cs or .rex/*.csproj found in the {Environment.CurrentDirectory}.");
-        return 1;
-    }
-
-    var timeout = ctx.ParseResult.GetValueForOption(timeoutOption);
-    var env = ctx.ParseResult.GetValueForOption(enviroment);
-    var envFiles = ctx.ParseResult.GetValueForOption(environmentFileOption);
-    var secretFile = ctx.ParseResult.GetValueForOption(secretFileOption);
-    var verbose = ctx.ParseResult.GetValueForOption(verboseOption);
-    var targets = ctx.ParseResult.GetValueForArgument<string[]>(targetsArgument);
-
-    var remaining = ctx.ParseResult.UnparsedTokens;
-
-    var args = new List<string>()
-    {
-        "--rollback",
-    };
-    if (verbose)
-        args.Add("-v");
-    if (timeout.HasValue)
-        args.Add($"-t {timeout.Value}");
-    if (env is not null)
-    {
-        foreach (var e in env)
-            args.Add($"-e {e}");
-    }
-
-    if (envFiles is not null)
-    {
-        foreach (var f in envFiles)
-            args.Add($"--env-file {f.FullName}");
-    }
-
-    if (secretFile is not null)
-    {
-        foreach (var f in secretFile)
-            args.Add($"--secret-file {f.FullName}");
-    }
-
-    args.AddRange(targets);
-
-    if (remaining is not null)
-        args.AddRange(remaining);
-
-    if (file.EndsWith(".csproj"))
-    {
-        var p = Process.Start("dotnet", $"run -v quiet --project {file} -- {string.Join(' ', args)}");
-        p?.WaitForExit();
-        return p?.ExitCode ?? 1;
-    }
-
-    if (file.EndsWith(".cs"))
-    {
-        var p = Process.Start("dotnet", $"run -v quiet {file} -- {string.Join(' ', args)}");
-        p?.WaitForExit();
-        return p?.ExitCode ?? 1;
-    }
-
-    if (file.EndsWith(".dll"))
-    {
-        var p = Process.Start("dotnet", $"{file} -- {string.Join(' ', args)}");
-        p?.WaitForExit();
-        return p?.ExitCode ?? 1;
-    }
-
-    return 1;
-});
-
-var destroyCommand = new Command("destroy", "Destroy a specific deployment.")
+// rex jobs run many "build" "clean" "test"
+var jobRunAllCommand = new Command("many", "Run all jobs provided in the targets argument.")
 {
-    fileOption,
-    timeoutOption,
-    enviroment,
-    environmentFileOption,
-    secretFileOption,
-    verboseOption,
-    targetsArgument,
-}.WithHandler((ctx) =>
+    Options.File,
+    Options.Timeout,
+    Options.Env,
+    Options.EnvFiles,
+    Options.SecretFiles,
+    Options.Verbose,
+    Options.Targets,
+};
+
+jobRunAllCommand.SetAction(Handlers.GenerateTargetsAction(() =>
 {
-    var fileInfo = ctx.ParseResult.GetValueForOption(fileOption);
-    var file = fileInfo?.FullName;
-    if (file is null)
-    {
-        file = Project.FindProject(Environment.CurrentDirectory);
-    }
-    else
-    {
-        if (!Path.IsPathFullyQualified(file))
-        {
-            file = Path.GetFullPath(file, Environment.CurrentDirectory);
-        }
-    }
+    return new Hyprx.Exec.CommandArgs
+     {
+         "--jobs",
+     };
+}));
 
-    if (file is null)
-    {
-        Console.WriteLine($"No rexfile.cs, .rex/main.cs or .rex/*.csproj found in the {Environment.CurrentDirectory}.");
-        return 1;
-    }
-
-    var timeout = ctx.ParseResult.GetValueForOption(timeoutOption);
-    var env = ctx.ParseResult.GetValueForOption(enviroment);
-    var envFiles = ctx.ParseResult.GetValueForOption(environmentFileOption);
-    var secretFile = ctx.ParseResult.GetValueForOption(secretFileOption);
-    var verbose = ctx.ParseResult.GetValueForOption(verboseOption);
-    var targets = ctx.ParseResult.GetValueForArgument<string[]>(targetsArgument);
-
-    var remaining = ctx.ParseResult.UnparsedTokens;
-
-    var args = new List<string>()
-    {
-        "--destroy",
-    };
-    if (verbose)
-        args.Add("-v");
-    if (timeout.HasValue)
-        args.Add($"-t {timeout.Value}");
-
-    if (env is not null)
-    {
-        foreach (var e in env)
-            args.Add($"-e {e}");
-    }
-
-    if (envFiles is not null)
-    {
-        foreach (var f in envFiles)
-            args.Add($"--env-file {f.FullName}");
-    }
-
-    if (secretFile is not null)
-    {
-        foreach (var f in secretFile)
-            args.Add($"--secret-file {f.FullName}");
-    }
-
-    args.AddRange(targets);
-
-    if (remaining is not null)
-        args.AddRange(remaining);
-
-    if (file.EndsWith(".csproj"))
-    {
-        var p = Process.Start("dotnet", $"run -v quiet --project {file} -- {string.Join(' ', args)}");
-        p?.WaitForExit();
-        return p?.ExitCode ?? 1;
-    }
-
-    if (file.EndsWith(".cs"))
-    {
-        var p = Process.Start("dotnet", $"run -v quiet {file} -- {string.Join(' ', args)}");
-        p?.WaitForExit();
-        return p?.ExitCode ?? 1;
-    }
-
-    if (file.EndsWith(".dll"))
-    {
-        var p = Process.Start("dotnet", $"{file} -- {string.Join(' ', args)}");
-        p?.WaitForExit();
-        return p?.ExitCode ?? 1;
-    }
-
-    return 1;
-});
-
-var root = new RootCommand("rex")
+var jobRunCommand = new Command("run", "Run a specific job.")
 {
-    listCommand,
-    taskCommand,
+    Options.File,
+    Options.Timeout,
+    Options.Env,
+    Options.EnvFiles,
+    Options.SecretFiles,
+    Options.Verbose,
+    Options.Target,
+    jobRunAllCommand,
+};
+
+jobRunCommand.TreatUnmatchedTokensAsErrors = false;
+jobRunCommand.SetAction(Handlers.GenerateTargetAction(() =>
+{
+    return new Hyprx.Exec.CommandArgs
+     {
+         "--job",
+     };
+}));
+
+var jobListCommand = new Command("list", "List all available jobs.")
+{
+    Options.File,
+    Options.Verbose,
+};
+
+jobListCommand.SetAction(Handlers.ListJobsAction());
+
+var jobsCommand = new Command("jobs", "Manage jobs. By default this will run multiple jobs")
+{
+    Options.File,
+    Options.Timeout,
+    Options.Env,
+    Options.EnvFiles,
+    Options.SecretFiles,
+    Options.Verbose,
+    jobRunCommand,
+    jobListCommand,
+};
+
+jobsCommand.TreatUnmatchedTokensAsErrors = false;
+jobsCommand.SetAction(Handlers.GenerateTargetsAction(() =>
+{
+    return new Hyprx.Exec.CommandArgs
+     {
+         "--jobs",
+     };
+}));
+
+// rex run many "build" "clean" "test"
+var runManyCommand = new Command("many", "Run multiple targets. If the first target is a job, it will run all jobs. If the first target is a task, it will run all tasks.")
+{
+    Options.File,
+    Options.Timeout,
+    Options.Env,
+    Options.EnvFiles,
+    Options.SecretFiles,
+    Options.Verbose,
+    Options.Targets,
+};
+
+runManyCommand.TreatUnmatchedTokensAsErrors = false;
+runManyCommand.SetAction(Handlers.GenerateTargetsAction(() =>
+{
+    return new Hyprx.Exec.CommandArgs
+     {
+         "--auto",
+         "--many",
+     };
+}));
+
+var runCommand = new Command("run", "Run a target, task or job.")
+{
+    Options.File,
+    Options.Timeout,
+    Options.Env,
+    Options.EnvFiles,
+    Options.SecretFiles,
+    Options.Verbose,
+    Options.Target,
+    runManyCommand,
+};
+
+runCommand.TreatUnmatchedTokensAsErrors = false;
+runCommand.SetAction(Handlers.GenerateTargetAction(() =>
+{
+    return new Hyprx.Exec.CommandArgs
+     {
+         "--auto",
+     };
+}));
+
+var buildCommand = new Command("build", "Invokes the build job or task. This is a shortcut for 'rex run build` ")
+{
+    Options.File,
+    Options.Timeout,
+    Options.Env,
+    Options.EnvFiles,
+    Options.SecretFiles,
+    Options.Verbose,
+};
+buildCommand.SetAction(Handlers.GenerateAutoAction("--build"));
+
+var cleanCommand = new Command("clean", "Invokes the clean job or task. This is a shortcut for 'rex run clean` ")
+{
+    Options.File,
+    Options.Timeout,
+    Options.Env,
+    Options.EnvFiles,
+    Options.SecretFiles,
+    Options.Verbose,
+};
+cleanCommand.SetAction(Handlers.GenerateAutoAction("--clean"));
+
+var testCommand = new Command("test", "Runs tests. This is a shortcut for 'rex run test` ")
+{
+    Options.File,
+    Options.Timeout,
+    Options.Env,
+    Options.EnvFiles,
+    Options.SecretFiles,
+    Options.Verbose,
+};
+
+testCommand.TreatUnmatchedTokensAsErrors = false;
+testCommand.SetAction(Handlers.GenerateAutoAction("--test"));
+
+var pack = new Command("pack", "Packages a library or application. This is a shortcut for 'rex run pack` ")
+{
+    Options.File,
+    Options.Timeout,
+    Options.Env,
+    Options.EnvFiles,
+    Options.SecretFiles,
+    Options.Verbose,
+};
+
+pack.TreatUnmatchedTokensAsErrors = false;
+pack.SetAction(Handlers.GenerateAutoAction("--pack"));
+
+var publishCommand = new Command("publish", "Invokes the publish job or task. This is a shortcut for 'rex run publish` ")
+{
+    Options.File,
+    Options.Timeout,
+    Options.Env,
+    Options.EnvFiles,
+    Options.SecretFiles,
+    Options.Verbose,
+};
+publishCommand.TreatUnmatchedTokensAsErrors = false;
+publishCommand.SetAction(Handlers.GenerateAutoAction("--publish"));
+
+var upCommand = new Command("up", "Deploys or spins up infrastructure. This is a shortcut for 'rex run up` ")
+{
+    Options.File,
+    Options.Timeout,
+    Options.Env,
+    Options.EnvFiles,
+    Options.SecretFiles,
+    Options.Verbose,
+};
+upCommand.TreatUnmatchedTokensAsErrors = false;
+upCommand.SetAction(Handlers.GenerateAutoAction("--up"));
+
+var downCommand = new Command("down", "Spins down infrastructure or removes an application from deployment. This is a shortcut for 'rex run down` ")
+{
+    Options.File,
+    Options.Timeout,
+    Options.Env,
+    Options.EnvFiles,
+    Options.SecretFiles,
+    Options.Verbose,
+};
+downCommand.TreatUnmatchedTokensAsErrors = false;
+downCommand.SetAction(Handlers.GenerateAutoAction("--down"));
+
+var rollback = new Command("rollback", "Rolls back the last deployment. This is a shortcut for 'rex run rollback` ")
+{
+    Options.File,
+    Options.Timeout,
+    Options.Env,
+    Options.EnvFiles,
+    Options.SecretFiles,
+    Options.Verbose,
+};
+rollback.TreatUnmatchedTokensAsErrors = false;
+rollback.SetAction(Handlers.GenerateAutoAction("--rollback"));
+
+var rootCommand = new RootCommand("rex is a task runner")
+{
+    Options.File,
+    Options.Timeout,
+    Options.Env,
+    Options.EnvFiles,
+    Options.SecretFiles,
+    Options.Verbose,
+    listAllCommand,
+    taskRunCommand,
+    taskRunManyCommand,
+    tasksCommand,
+    jobRunCommand,
+    jobRunAllCommand,
     jobsCommand,
-    deployCommand,
-    rollbackCommand,
-    destroyCommand,
-    fileOption,
-    timeoutOption,
-    enviroment,
-    environmentFileOption,
-    secretFileOption,
-    verboseOption,
-    targetsArgument,
+    jobListCommand,
+    runCommand,
+    buildCommand,
+    cleanCommand,
 };
 
-root.WithHandler(ctx =>
-{
-    var fileInfo = ctx.ParseResult.GetValueForOption(fileOption);
-    var file = fileInfo?.FullName;
-    if (file is null)
-    {
-        file = Project.FindProject(Environment.CurrentDirectory);
-    }
-    else
-    {
-        if (!Path.IsPathFullyQualified(file))
-        {
-            file = Path.GetFullPath(file, Environment.CurrentDirectory);
-        }
-    }
+var result = rootCommand.Parse(args);
 
-    if (file is null)
-    {
-        Console.WriteLine($"No rexfile.cs, .rex/main.cs or .rex/*.csproj found in the {Environment.CurrentDirectory}.");
-        return 1;
-    }
-
-    var timeout = ctx.ParseResult.GetValueForOption(timeoutOption);
-    var env = ctx.ParseResult.GetValueForOption(enviroment);
-    var envFiles = ctx.ParseResult.GetValueForOption(environmentFileOption);
-    var secretFile = ctx.ParseResult.GetValueForOption(secretFileOption);
-    var verbose = ctx.ParseResult.GetValueForOption(verboseOption);
-    var targets = ctx.ParseResult.GetValueForArgument<string[]>(targetsArgument);
-
-    var remaining = ctx.ParseResult.UnparsedTokens;
-
-    var args = new List<string>()
-    {
-    };
-    if (verbose)
-        args.Add("-v");
-    if (timeout.HasValue)
-        args.Add($"-t {timeout.Value}");
-
-    if (env is not null)
-    {
-        foreach (var e in env)
-            args.Add($"-e {e}");
-    }
-
-    if (envFiles is not null)
-    {
-        foreach (var f in envFiles)
-            args.Add($"--env-file {f.FullName}");
-    }
-
-    if (secretFile is not null)
-    {
-        foreach (var f in secretFile)
-            args.Add($"--secret-file {f.FullName}");
-    }
-
-    args.AddRange(targets);
-
-    if (remaining is not null)
-        args.AddRange(remaining);
-
-    if (file.EndsWith(".csproj"))
-    {
-        Process.Start("dotnet", $"run -v quiet --project {file} {string.Join(" ", args)}")?.WaitForExit();
-        return 0;
-    }
-
-    if (file.EndsWith(".cs"))
-    {
-        Process.Start("dotnet", $"run -v quiet {file}  {string.Join(" ", args)}")?.WaitForExit();
-        return 0;
-    }
-
-    if (file.EndsWith(".dll"))
-    {
-        Process.Start("dotnet", $"{file}  {string.Join(" ", args)}")?.WaitForExit();
-        return 0;
-    }
-
-    return 1;
-});
-
-await root.InvokeAsync(args);
+await result.InvokeAsync();

@@ -35,6 +35,9 @@
 
   <ItemGroup>
     <PackageReference Include="System.CommandLine" />
+    <PackageReference Include="Hyprx.Core" />
+    <PackageReference Include="Hyprx.Exec" />
+    <PackageReference Include="Hyprx.Ansi" />
   </ItemGroup>
 
 </Project>

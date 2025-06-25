@@ -1,4 +1,4 @@
-namespace Rex;
+namespace Hyprx.Rex;
 
 public static class Project
 {

@@ -1,0 +1,1 @@
+global using SubCommand = System.CommandLine.Command;

@@ -1,4 +1,3 @@
-#if !NETLEGACY
 using System.Buffers.Binary;
 using System.Security.Cryptography;
 
@@ -6,11 +5,11 @@ namespace Hyprx.Crypto;
 
 public class AesGcmEncryptionProvider : IEncryptionProvider
 {
-    private readonly byte[] key;
+    private readonly AesGcmEncryptionProviderOptions options;
 
-    public AesGcmEncryptionProvider(byte[] key)
+    public AesGcmEncryptionProvider(AesGcmEncryptionProviderOptions options)
     {
-        this.key = key;
+        this.options = options ?? throw new ArgumentNullException(nameof(options));
     }
 
     public byte[] Encrypt(byte[] data)
@@ -20,29 +19,81 @@ public class AesGcmEncryptionProvider : IEncryptionProvider
 
     public ReadOnlySpan<byte> Encrypt(ReadOnlySpan<byte> data)
     {
+        var salt = Csrng.GetBytes(this.options.SaltSize);
+
+        short nonceSize = (short)AesGcm.NonceByteSizes.MaxSize;
+        short tagSize = (short)AesGcm.TagByteSizes.MaxSize;
+        short version = this.options.Version;
+        short saltSize = this.options.SaltSize;
+
+        int dataLength =
+            2 + // version
+            2 + // salt size
+            2 + // key size
+            2 + // pdk2 hash algorithm
+            2 + // nonce size
+            2 + // tag size
+            4 + // iterations
+            saltSize + // salt size
+            nonceSize + // nonce size
+            tagSize + // tag size
+            data.Length; // data size
+
         // https://stackoverflow.com/questions/60889345/using-the-aesgcm-class
         // Get parameter sizes
-        int nonceSize = AesGcm.NonceByteSizes.MaxSize;
-        int tagSize = AesGcm.TagByteSizes.MaxSize;
         int cipherSize = data.Length;
+        Span<byte> encryptedData = new byte[dataLength];
 
-        // We write everything into one big array for easier encoding
-        int encryptedDataLength = 4 + nonceSize + 4 + tagSize + cipherSize;
-        Span<byte> encryptedData = new byte[encryptedDataLength].AsSpan();
+        int index = 0;
 
         // Copy parameters
-        BinaryPrimitives.WriteInt32LittleEndian(encryptedData.Slice(0, 4), nonceSize);
-        BinaryPrimitives.WriteInt32LittleEndian(encryptedData.Slice(4 + nonceSize, 4), tagSize);
-        var nonce = encryptedData.Slice(4, nonceSize);
-        var tag = encryptedData.Slice(4 + nonceSize + 4, tagSize);
-        var cipherBytes = encryptedData.Slice(4 + nonceSize + 4 + tagSize, cipherSize);
+        BinaryPrimitives.WriteInt16LittleEndian(encryptedData.Slice(index, 2), version);
+        index += 2;
+
+        BinaryPrimitives.WriteInt16LittleEndian(encryptedData.Slice(index, 2), saltSize);
+        index += 2;
+
+        BinaryPrimitives.WriteInt16LittleEndian(encryptedData.Slice(index, 2), (short)this.options.KeyByteSize);
+        index += 2;
+
+        BinaryPrimitives.WriteInt16LittleEndian(encryptedData.Slice(index, 2), (short)this.options.Hash.Id);
+        index += 2;
+
+        BinaryPrimitives.WriteInt16LittleEndian(encryptedData.Slice(index, 2), (short)nonceSize);
+        index += 2;
+
+        BinaryPrimitives.WriteInt16LittleEndian(encryptedData.Slice(index, 2), (short)tagSize);
+        index += 2;
+
+        BinaryPrimitives.WriteInt32LittleEndian(encryptedData.Slice(index, 4), this.options.Iterations);
+        index += 4;
+
+        salt.CopyTo(encryptedData.Slice(index, saltSize));
+        index += saltSize;
+
+        var nonce = encryptedData.Slice(index, nonceSize);
+        index += nonceSize;
+
+        var tag = encryptedData.Slice(index, tagSize);
+        index += tagSize;
+
+        var cipherBytes = encryptedData.Slice(index, cipherSize);
 
         // Generate secure nonce
         RandomNumberGenerator.Fill(nonce);
 
+        var key = Rfc2898DeriveBytes.Pbkdf2(
+            this.options.Key,
+            salt,
+            this.options.Iterations,
+            this.options.Hash,
+            this.options.KeyByteSize);
+
         // Encrypt
-        using var aes = new AesGcm(this.key, AesGcm.TagByteSizes.MaxSize);
+        using var aes = new AesGcm(key, AesGcm.TagByteSizes.MaxSize);
         aes.Encrypt(nonce, data, cipherBytes, tag);
+
+        Array.Clear(key, 0, key.Length);
 
         return encryptedData;
     }
@@ -56,24 +107,106 @@ public class AesGcmEncryptionProvider : IEncryptionProvider
     {
         var encryptedData = data;
 
-        // Extract parameter sizes
-        int nonceSize = BinaryPrimitives.ReadInt32LittleEndian(encryptedData.Slice(0, 4));
-        int tagSize = BinaryPrimitives.ReadInt32LittleEndian(encryptedData.Slice(4 + nonceSize, 4));
-        int cipherSize = encryptedData.Length - 4 - nonceSize - 4 - tagSize;
+        /*
 
-        // Extract parameters
-        var nonce = encryptedData.Slice(4, nonceSize);
-        var tag = encryptedData.Slice(4 + nonceSize + 4, tagSize);
-        var cipherBytes = encryptedData.Slice(4 + nonceSize + 4 + tagSize, cipherSize);
+           int dataLength =
+            2 + // version
+            2 + // salt size
+            2 + // key size
+            2 + // pdk2 hash algorithm
+            2 + // nonce size
+            2 + // tag size
+            4 + // iterations
+            saltSize + // salt size
+            nonceSize + // nonce size
+            tagSize + // tag size
+            data.Length; // data size
+            */
+
+        var index = 0;
+        var version = BinaryPrimitives.ReadInt16LittleEndian(encryptedData.Slice(index, 2));
+        index += 2;
+
+        if (version != 1)
+        {
+            throw new InvalidOperationException($"Unsupported version: {version}. Expected: {this.options.Version}.");
+        }
+
+        // Check salt size
+        var saltSize = BinaryPrimitives.ReadInt16LittleEndian(encryptedData.Slice(index, 2));
+        index += 2;
+
+        var keySize = BinaryPrimitives.ReadInt16LittleEndian(encryptedData.Slice(index, 2));
+        index += 2;
+
+        var hashAlgorithmId = BinaryPrimitives.ReadInt16LittleEndian(encryptedData.Slice(index, 2));
+        index += 2;
+
+        var nonceSize = BinaryPrimitives.ReadInt16LittleEndian(encryptedData.Slice(index, 2));
+        index += 2;
+
+        var tagSize = BinaryPrimitives.ReadInt16LittleEndian(encryptedData.Slice(index, 2));
+        index += 2;
+
+        var iterations = BinaryPrimitives.ReadInt32LittleEndian(encryptedData.Slice(index, 4));
+        index += 4;
+
+        var salt = encryptedData.Slice(index, saltSize);
+        index += saltSize;
+
+        // ignore values from this.options on decrypt, only use the values from the encrypted data
+        var nonce = encryptedData.Slice(index, nonceSize);
+        index += nonceSize;
+
+        var tag = encryptedData.Slice(index, tagSize);
+        index += tagSize;
+
+        var cipheredBytes = encryptedData.Slice(index);
+
+        var hash = Pbkdf2Hash.FromId(hashAlgorithmId);
+
+        var key = Rfc2898DeriveBytes.Pbkdf2(
+            this.options.Key,
+            salt.ToArray(),
+            iterations,
+            hash,
+            keySize);
 
         // Decrypt
-        Span<byte> plainBytes = new byte[cipherSize];
-        using var aes = new AesGcm(this.key, AesGcm.TagByteSizes.MaxSize);
-        aes.Decrypt(nonce, cipherBytes, tag, plainBytes);
+        Span<byte> plainBytes = new byte[cipheredBytes.Length];
+        using var aes = new AesGcm(key, tagSize);
+        aes.Decrypt(nonce, cipheredBytes, tag, plainBytes);
+
+        Array.Clear(key, 0, key.Length);
 
         // Convert plain bytes back into string
         return plainBytes;
     }
 }
 
-#endif
+public class AesGcmEncryptionProviderOptions
+{
+    public byte[] Key { get; set; } = [];
+
+    public int Iterations { get; set; } = 60000;
+
+    public short Version { get; set; } = 1;
+
+    public short SaltSize { get; set; } = 32;
+
+    public Pbkdf2Hash Hash { get; set; } = Pbkdf2Hash.SHA256;
+
+    public int KeyByteSize { get; set; } = 32;
+
+    public AesGcmEncryptionProviderOptions WithKey(ReadOnlySpan<char> key, System.Text.Encoding? encoding = null)
+    {
+        if (key.IsEmpty)
+            throw new ArgumentException("Key cannot be null or empty.", nameof(key));
+
+        encoding ??= EncryptionUtil.DefaultEncoding;
+        var keySet = key.ToArray();
+        this.Key = encoding.GetBytes(keySet);
+        Array.Clear(keySet, 0, keySet.Length);
+        return this;
+    }
+}

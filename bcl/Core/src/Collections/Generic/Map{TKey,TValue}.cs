@@ -56,9 +56,9 @@ public class Map<TKey, TValue> : Dictionary<TKey, TValue>
 
     public Map<TKey, TValue> AddRange(IEnumerable<(TKey, TValue)> items)
     {
-        foreach (var item in items)
+        foreach (var (key, value) in items)
         {
-            this.Add(item);
+            this.Add(key, value);
         }
 
         return this;

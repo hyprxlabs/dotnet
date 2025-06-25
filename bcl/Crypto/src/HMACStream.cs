@@ -65,13 +65,12 @@ namespace Hyprx.Crypto
             Stream innerStream,
             bool write,
             Encoding encoding,
-            KeyedHashAlgorithmType keyedHashAlgorithmType,
+            Pbkdf2Hash keyedHashAlgorithmType,
             byte[] key)
             : this(innerStream, write, encoding, HashAlgorithmName.SHA256)
         {
-            var algo = keyedHashAlgorithmType.CreateKeyedHashAlgorithm();
+            var algo = keyedHashAlgorithmType.CreateHmac(key);
             this.endOfStreamMarker = new byte[algo.HashSize];
-            algo.Key = key;
             this.signer = algo;
         }
 

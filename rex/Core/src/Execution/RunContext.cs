@@ -4,13 +4,20 @@ namespace Hyprx.Rex.Execution;
 
 public class RunContext
 {
-    public RunContext(string name, IServiceProvider serviceProvider)
+    public RunContext(string name, IServiceProvider serviceProvider, string[]? args = null, string? cwd = null)
     {
         ArgumentNullException.ThrowIfNullOrWhiteSpace(name, nameof(name));
         ArgumentNullException.ThrowIfNull(serviceProvider, nameof(serviceProvider));
 
         this.Name = name;
         this.Services = serviceProvider;
+        this.Args = args ?? [];
+        this.Cwd = cwd;
+
+        foreach (var (key, value) in Hyprx.Env.Vars)
+        {
+            this.Env[key] = value;
+        }
     }
 
     protected RunContext(RunContext context)

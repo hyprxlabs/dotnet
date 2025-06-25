@@ -40,23 +40,6 @@ public static class EncryptionExtensions
         return diff == 0;
     }
 
-    public static short HashSize(this KeyedHashAlgorithmType type)
-    {
-        switch (type)
-        {
-            case KeyedHashAlgorithmType.HMACSHA256:
-                return 32;
-            case KeyedHashAlgorithmType.HMACSHA384:
-                return 48;
-
-            case KeyedHashAlgorithmType.HMACSHA512:
-                return 64;
-
-            default:
-                throw new NotSupportedException($"Unsupported algorithm type {type}.");
-        }
-    }
-
     public static string Encrypt(this IEncryptionProvider provider, string data, Encoding? encoding = null)
     {
         encoding ??= EncryptionUtil.DefaultEncoding;
