@@ -28,26 +28,34 @@ public class AzCliKeyVaultExpander : ISecretVaultExpander
 
     public string? KeyVaultName { get; set; } = null;
 
-    public bool CanHandle(string innerExpression)
+    public bool CanHandle(IList<string> expressions)
     {
+        if (expressions.Count < 3)
+            return false;
+
+        if (!expressions[0].EqualsFold("secret"))
+            return false;
+
+        var url = expressions[1];
+
         if (!string.IsNullOrWhiteSpace(this.KeyVaultName))
         {
-            return innerExpression.StartsWith($"{this.SecretsExpression} {this.Protocol}://{this.KeyVaultName}", StringComparison.OrdinalIgnoreCase) &&
-                   innerExpression.Contains($"{this.SecretsExpression} azure-key-vault://{this.KeyVaultName}", StringComparison.OrdinalIgnoreCase);
+            return url.StartsWith($"{this.Protocol}://{this.KeyVaultName}", StringComparison.OrdinalIgnoreCase) ||
+                   url.StartsWith($"azure-key-vault://{this.KeyVaultName}", StringComparison.OrdinalIgnoreCase);
         }
 
-        return innerExpression.StartsWith($"{this.SecretsExpression} {this.Protocol}://", StringComparison.OrdinalIgnoreCase) &&
-               innerExpression.Contains($"{this.SecretsExpression} azure-key-vault://", StringComparison.OrdinalIgnoreCase);
+        return url.StartsWith($"{this.Protocol}://", StringComparison.OrdinalIgnoreCase) ||
+               url.StartsWith($"azure-key-vault://", StringComparison.OrdinalIgnoreCase);
     }
 
-    public ExpansionResult Expand(string innerExpression)
+    public ExpansionResult Expand(IList<string> args)
     {
-        var (result, error) = SecretExpression.Parse(innerExpression);
+        var (result, error) = SecretExpression.Parse(args);
         if (error != null)
         {
             return new ExpansionResult
             {
-                Error = new Exception($"Failed to parse secret expression '{innerExpression}': {error}"),
+                Error = new Exception($"Failed to parse secret expression '{string.Join(" ", args)}': {error}"),
                 Position = -1,
             };
         }
@@ -56,7 +64,7 @@ public class AzCliKeyVaultExpander : ISecretVaultExpander
         {
             return new ExpansionResult
             {
-                Error = new InvalidOperationException($"Failed to parse secret expression '{innerExpression}'."),
+                Error = new InvalidOperationException($"Failed to parse secret expression '{string.Join(" ", args)}'."),
                 Position = -1,
             };
         }
@@ -160,7 +168,7 @@ public class AzCliKeyVaultExpander : ISecretVaultExpander
 
                 var secretValue = sg.GenerateAsString(result.Size);
 
-                var args = new List<string>()
+                var args0 = new List<string>()
                             {
                                 "keyvault",
                                 "secret",
@@ -172,8 +180,8 @@ public class AzCliKeyVaultExpander : ISecretVaultExpander
 
                 if (result.ExpiresAt.HasValue)
                 {
-                    args.Add("--expires");
-                    args.Add(result.ExpiresAt.Value.ToString("o"));
+                    args0.Add("--expires");
+                    args0.Add(result.ExpiresAt.Value.ToString("o"));
                 }
 
                 var si2 = new ProcessStartInfo()
@@ -185,7 +193,7 @@ public class AzCliKeyVaultExpander : ISecretVaultExpander
                     CreateNoWindow = true,
                 };
 
-                foreach (var arg in args)
+                foreach (var arg in args0)
                 {
                     si2.ArgumentList.Add(arg);
                 }
@@ -218,19 +226,19 @@ public class AzCliKeyVaultExpander : ISecretVaultExpander
 
         return new ExpansionResult
         {
-            Error = new Exception($"Failed to expand secret '{innerExpression}'. \n stdout:{text} \n stderr: {stderr}"),
+            Error = new Exception($"Failed to expand secret '{string.Join(" ", args)}'. \n stdout:{text} \n stderr: {stderr}"),
             Position = -1,
         };
     }
 
-    public async Task<ExpansionResult> ExpandAsync(string innerExpression, CancellationToken cancellationToken = default)
+    public async Task<ExpansionResult> ExpandAsync(IList<string> args, CancellationToken cancellationToken = default)
     {
-        var (result, error) = SecretExpression.Parse(innerExpression);
+        var (result, error) = SecretExpression.Parse(args);
         if (error != null)
         {
             return new ExpansionResult
             {
-                Error = new Exception($"Failed to parse secret expression '{innerExpression}': {error}"),
+                Error = new Exception($"Failed to parse secret expression '{string.Join(" ", args)}': {error}"),
                 Position = -1,
             };
         }
@@ -239,7 +247,7 @@ public class AzCliKeyVaultExpander : ISecretVaultExpander
         {
             return new ExpansionResult
             {
-                Error = new InvalidOperationException($"Failed to parse secret expression '{innerExpression}'."),
+                Error = new InvalidOperationException($"Failed to parse secret expression '{string.Join(" ", args)}'."),
                 Position = -1,
             };
         }
@@ -343,7 +351,7 @@ public class AzCliKeyVaultExpander : ISecretVaultExpander
 
                 var secretValue = sg.GenerateAsString(result.Size);
 
-                var args = new List<string>()
+                var argList = new List<string>()
                             {
                                 "keyvault",
                                 "secret",
@@ -355,8 +363,8 @@ public class AzCliKeyVaultExpander : ISecretVaultExpander
 
                 if (result.ExpiresAt.HasValue)
                 {
-                    args.Add("--expires");
-                    args.Add(result.ExpiresAt.Value.ToString("o"));
+                    argList.Add("--expires");
+                    argList.Add(result.ExpiresAt.Value.ToString("o"));
                 }
 
                 var si2 = new ProcessStartInfo()
@@ -368,7 +376,7 @@ public class AzCliKeyVaultExpander : ISecretVaultExpander
                     CreateNoWindow = true,
                 };
 
-                foreach (var arg in args)
+                foreach (var arg in argList)
                 {
                     si2.ArgumentList.Add(arg);
                 }
@@ -401,7 +409,7 @@ public class AzCliKeyVaultExpander : ISecretVaultExpander
 
         return new ExpansionResult
         {
-            Error = new Exception($"Failed to expand secret '{innerExpression}'. \n stdout:{text} \n stderr: {stderr}"),
+            Error = new Exception($"Failed to expand secret '{string.Join(" ", args)}'. \n stdout:{text} \n stderr: {stderr}"),
             Position = -1,
         };
     }

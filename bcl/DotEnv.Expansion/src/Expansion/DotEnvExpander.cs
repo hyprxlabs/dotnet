@@ -265,10 +265,10 @@ public class DotEnvExpander
                         {
                             try
                             {
-                                if (!expander.CanHandle(expression))
+                                if (!expander.CanHandle(args))
                                     continue;
 
-                                var result = await expander.ExpandAsync(expression, cancellationToken);
+                                var result = await expander.ExpandAsync(args, cancellationToken);
                                 if (result.IsOk)
                                 {
                                     output.Append(result.Value);
@@ -742,6 +742,7 @@ public class DotEnvExpander
                 kind = TokenKind.None;
 
                 var args = SecretExpression.ParseArgs(expression);
+                var vaultExpanderHandled = false;
                 if (args.Count > 0 && args[0] == "secret")
                 {
                     if (o.SecretVaultExpanders.Count == 0)
@@ -758,13 +759,14 @@ public class DotEnvExpander
                     {
                         try
                         {
-                            if (!expander.CanHandle(expression))
+                            if (!expander.CanHandle(args))
                                 continue;
 
-                            var result = expander.Expand(expression);
+                            var result = expander.Expand(args);
                             if (result.IsOk)
                             {
                                 output.Append(result.Value);
+                                vaultExpanderHandled = true;
                                 break;
                             }
                             else
@@ -785,6 +787,13 @@ public class DotEnvExpander
                             };
                         }
                     }
+                }
+
+                if (vaultExpanderHandled)
+                {
+                    kind = TokenKind.None;
+                    tokenBuilder.Clear();
+                    continue;
                 }
 
                 if (o.EnableShell)
@@ -873,6 +882,10 @@ public class DotEnvExpander
                     var stdout = process.StandardOutput.ReadToEnd().Trim();
                     output.Append(stdout);
                 }
+
+                kind = TokenKind.None;
+                tokenBuilder.Clear();
+                continue;
             }
 
             if (kind == TokenKind.BashInterpolation && c is '}')

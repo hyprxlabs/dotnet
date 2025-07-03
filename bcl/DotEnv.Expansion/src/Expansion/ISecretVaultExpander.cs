@@ -6,13 +6,13 @@ public interface ISecretVaultExpander
 
     string SecretsExpression { set; }
 
-    bool CanHandle(string innerExpression);
+    bool CanHandle(IList<string> expressions);
 
     bool Synchronous { get; }
 
-    ExpansionResult Expand(string innerExpression);
+    ExpansionResult Expand(IList<string> args);
 
     Task<ExpansionResult> ExpandAsync(
-        string innerExpression,
+        IList<string> args,
         CancellationToken cancellationToken = default);
 }

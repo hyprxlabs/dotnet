@@ -37,9 +37,9 @@ public class SecretExpression
         Double = 2,
     }
 
-    public static (SecretExpression? Result, string? Error) Parse(string expression)
+    public static (SecretExpression? Result, string? Error) Parse(IList<string> args)
     {
-        var parts = ParseArgs(expression);
+        var parts = args;
         if (parts.Count == 0)
         {
             return (null, "Expression cannot be empty.");
@@ -69,7 +69,7 @@ public class SecretExpression
         bool create = false;
         DateTime? expiresAt = null;
 
-        var ceiling = parts.Count - 1;
+        var ceiling = parts.Count;
         for (var i = 0; i < parts.Count; i++)
         {
             var part = parts[i];

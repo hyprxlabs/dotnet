@@ -12,7 +12,7 @@ public static class AzCliKeyVaultExpanderTests
     {
         var content =
 """
-SECRET3=$(secret akv:///kv-hyprx-tmp/secret3 --create --size 32)
+SECRET3=$(secret akv://kv-hyprx-tmp/secret3 --create --size 32)
 """;
 
         var azPath = PathFinder.Which("az");
@@ -37,14 +37,29 @@ SECRET3=$(secret akv:///kv-hyprx-tmp/secret3 --create --size 32)
             {
                 Assert.Fail($"Failed to delete secret3: {o.Error}");
             }
+
+            o = az.Run(["keyvault", "secret", "purge", "--name", "secret3", "--vault-name", "kv-hyprx-tmp"]);
+            if (o.IsError)
+            {
+                Assert.Fail($"Failed to purge secret3: {o.Error}");
+            }
         }
 
         var expander = new ExpansionBuilder()
+            .WithExpressions()
             .AddAzureCliKeyVault()
             .Build();
 
         var env = DotEnvSerializer.DeserializeDocument(content);
         var summary = expander.Expand(env);
+
+        if (summary.IsError)
+        {
+            foreach (var error in summary.Errors)
+            {
+                Console.WriteLine($"Error: {error}");
+            }
+        }
 
         var value = env["SECRET3"];
         Console.WriteLine($"SECRET3: {value}");

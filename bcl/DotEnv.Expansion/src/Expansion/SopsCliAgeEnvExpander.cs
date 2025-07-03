@@ -22,23 +22,29 @@ public class SopsCliAgeEnvExpander : ISecretVaultExpander
 
     public string? AgeKey { get; set; } = null;
 
-    public bool CanHandle(string innerExpression)
+    public bool CanHandle(IList<string> expressions)
     {
+        if (expressions is null || expressions.Count < 3)
+        {
+            return false;
+        }
+
+        if (!expressions[0].EqualsFold(this.SecretsExpression))
+            return false;
+
         if (!string.IsNullOrWhiteSpace(this.EnvPath))
         {
-            return innerExpression.StartsWith($"{this.SecretsExpression} {this.Protocol}:///{this.EnvPath}", StringComparison.OrdinalIgnoreCase);
+            return expressions[1].StartsWith($"{this.Protocol}:///{this.EnvPath}", StringComparison.OrdinalIgnoreCase);
         }
-        else
-        {
-            return innerExpression.StartsWith($"{this.SecretsExpression} {this.Protocol}:///", StringComparison.OrdinalIgnoreCase);
-        }
+
+        return expressions[1].StartsWith($"{this.Protocol}:///", StringComparison.OrdinalIgnoreCase);
     }
 
     public bool Synchronous => true;
 
-    public ExpansionResult Expand(string innerExpression)
+    public ExpansionResult Expand(IList<string> args)
     {
-        var (expression, error) = SecretExpression.Parse(innerExpression);
+        var (expression, error) = SecretExpression.Parse(args);
         if (error is not null)
         {
             return new ExpansionResult()
@@ -120,9 +126,9 @@ public class SopsCliAgeEnvExpander : ISecretVaultExpander
         };
     }
 
-    public async Task<ExpansionResult> ExpandAsync(string innerExpression, CancellationToken cancellationToken = default)
+    public async Task<ExpansionResult> ExpandAsync(IList<string> args, CancellationToken cancellationToken = default)
     {
-        var (expression, error) = SecretExpression.Parse(innerExpression);
+        var (expression, error) = SecretExpression.Parse(args);
         if (error is not null)
         {
             return new ExpansionResult()

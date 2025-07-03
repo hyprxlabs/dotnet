@@ -31,4 +31,9 @@ public class DotEnvExpansionError
     public string Key { get; set; } = string.Empty;
 
     public int Position { get; set; } = -1;
+
+    public override string ToString()
+    {
+        return this.Message;
+    }
 }
