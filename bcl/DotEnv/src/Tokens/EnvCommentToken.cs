@@ -37,6 +37,8 @@ public class EnvCommentToken : EnvToken
 
     public override EnvTokenType Type => EnvTokenType.Comment;
 
+    public bool Inline { get; set; } = false;
+
     public new string Value
     {
         get => this.value;

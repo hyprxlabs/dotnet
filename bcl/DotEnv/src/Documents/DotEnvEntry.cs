@@ -39,6 +39,8 @@ public class DotEnvEntry : DotEnvNode
 
     public int Order { get; set; } = 0;
 
+    public DotEnvQuote Quote { get; set; } = DotEnvQuote.Auto;
+
     public new string Value
     {
         get

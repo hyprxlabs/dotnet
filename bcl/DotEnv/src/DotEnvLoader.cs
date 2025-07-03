@@ -27,8 +27,6 @@ public static class DotEnvLoader
             foreach (var file in options.Files)
             {
                 var clone = (DotEnvLoadOptions)options.Clone();
-                clone.ExpandVariables = doc;
-
                 using var fs = File.OpenRead(file);
                 var d = (IDictionary<string, string>)DotEnvSerializer.DeserializeDocument(fs, options);
                 foreach (var pair in d)
@@ -41,7 +39,6 @@ public static class DotEnvLoader
         if (options.Content is not null)
         {
             var clone = (DotEnvLoadOptions)options.Clone();
-            clone.ExpandVariables = doc;
             var d = (IDictionary<string, string>)DotEnvSerializer.DeserializeDocument(options.Content, options);
             foreach (var pair in d)
             {
@@ -57,9 +54,13 @@ public static class DotEnvLoader
         var doc = Parse(options);
         foreach (var entry in doc)
         {
-            if (entry is DotEnvEntry var && (options.OverrideEnvironment || !Env.Has(var.Name)))
+            if (entry is DotEnvEntry var)
             {
-                Env.Set(var.Name, var.Value);
+                var hasValue = Environment.GetEnvironmentVariable(var.Name) is not null;
+                if (options.OverrideEnvironment || !hasValue)
+                {
+                    Environment.SetEnvironmentVariable(var.Name, var.Value);
+                }
             }
         }
     }

@@ -22,11 +22,33 @@ internal static class Serializer
             else
                 first = false;
 
-            writer.Write(item.Key);
-            writer.Write('=');
-            writer.Write('"');
-            writer.Write(item.Value);
-            writer.Write('"');
+            var value = item.Value ?? string.Empty;
+            var shouldQuote = value.IndexOfAny(['=', ' ', '\v', '\t', '\n', '\r', '"', '\'', '`']) >= 0;
+            if (!shouldQuote)
+            {
+                writer.Write(item.Key);
+                writer.Write('=');
+                writer.Write(value);
+            }
+            else
+            {
+                var sb = new StringBuilder(value.Length + 2);
+                foreach(var c in value)
+                {
+                    if (c == '"')
+                    {
+                        sb.Append('\\');
+                    }
+
+                    sb.Append(c);
+                }
+
+                writer.Write(item.Key);
+                writer.Write('=');
+                writer.Write('"');
+                writer.Write(value);
+                writer.Write('"');
+            }
         }
     }
 
@@ -47,11 +69,24 @@ internal static class Serializer
                 first = false;
             }
 
-            writer.Write(item.Key);
-            writer.Write('=');
-            writer.Write('"');
-            writer.Write(item.Value);
-            writer.Write('"');
+            var value = item.Value?.ToString() ?? string.Empty;
+
+            var shouldQuote = value.IndexOfAny(['=', ' ', '\v', '\t', '\n', '\r', '"', '\'', '`']) >= 0;
+            if (!shouldQuote)
+            {
+                writer.Write(item.Key);
+                writer.Write('=');
+                writer.Write(value);
+            }
+            else
+            {
+                var quote = value.Contains("\"") ? '\'' : '"';
+                writer.Write(item.Key);
+                writer.Write('=');
+                writer.Write(quote);
+                writer.Write(value);
+                writer.Write(quote);
+            }
         }
     }
 
@@ -66,12 +101,21 @@ internal static class Serializer
             switch (item)
             {
                 case DotEnvComment comment:
-                    if (first)
-                        first = false;
+                    if (comment.Inline)
+                    {
+                        writer.Write(" # ");
+                        writer.Write(comment.RawValue);
+                    }
                     else
-                        writer.WriteLine();
-                    writer.Write("# ");
-                    writer.Write(comment.RawValue);
+                    {
+                        if (first)
+                            first = false;
+                        else
+                            writer.WriteLine();
+                        writer.Write("# ");
+                        writer.Write(comment.RawValue);
+                    }
+
                     break;
 
                 case DotEnvEntry pair:
@@ -79,12 +123,122 @@ internal static class Serializer
                         first = false;
                     else
                         writer.WriteLine();
-                    var quote = pair.Value.Contains("\"") ? '\'' : '"';
-                    writer.Write(pair.Name);
-                    writer.Write('=');
-                    writer.Write(quote);
-                    writer.Write(pair.Value);
-                    writer.Write(quote);
+
+                    switch (pair.Quote)
+                    {
+                        case DotEnvQuote.Json:
+                        case DotEnvQuote.Yaml:
+                        case DotEnvQuote.None:
+                            writer.Write(pair.Name);
+                            writer.Write('=');
+                            writer.Write(pair.Value);
+                            break;
+
+                        case DotEnvQuote.Auto:
+                            {
+                                var shouldQuote = pair.Value.IndexOfAny(['=', ' ', '\v', '\t', '\n', '\r', '"', '\'', '`']) >= 0;
+                                if (!shouldQuote)
+                                {
+                                    writer.Write(pair.Name);
+                                    writer.Write('=');
+                                    writer.Write(pair.Value);
+                                }
+                                else
+                                {
+                                    writer.Write(pair.Name);
+                                    writer.Write('=');
+                                    writer.Write('"');
+                                    var sb = new StringBuilder(pair.Value.Length + 2);
+                                    foreach (var c in pair.Value)
+                                    {
+                                        if (c == '"')
+                                        {
+                                            writer.Write('\\');
+                                        }
+
+                                        writer.Write(c);
+                                    }
+
+                                    writer.Write('"');
+                                }
+                            }
+
+                            break;
+
+                        case DotEnvQuote.Double:
+                            {
+                                writer.Write(pair.Name);
+                                writer.Write('=');
+                                writer.Write('"');
+                                for(var i = 0; i < pair.Value.Length; i++)
+                                {
+                                    var c = pair.Value[i];
+                                    if (c == '\"')
+                                    {
+                                        var last = char.MinValue;
+                                        if (i > 0)
+                                            last = pair.Value[i - 1];
+
+                                        if (last != '\\')
+                                        {
+                                            writer.Write('\\');
+                                        }
+
+                                        writer.Write(c);
+                                    }
+
+                                    writer.Write(c);
+                                }
+
+                                foreach (var c in pair.Value)
+                                {
+                                    switch (c)
+                                    {
+                                        case '\r':
+                                            writer.Write("\\r");
+                                            continue;
+                                        case '\n':
+                                            writer.Write("\\n");
+                                            continue;
+                                        case '\t':
+                                            writer.Write("\\t");
+                                            continue;
+                                        case '\v':
+                                            writer.Write("\\v");
+                                            continue;
+                                        case '\\':
+                                            writer.Write("\\\\");
+                                            continue;
+                                        case '"':
+                                            writer.Write("\\\"");
+                                            continue;
+                                    }
+
+                                    writer.Write(c);
+                                }
+
+                                writer.Write('"');
+                            }
+
+                            break;
+
+                        case DotEnvQuote.Single:
+                            writer.Write(pair.Name);
+                            writer.Write('=');
+                            writer.Write('\'');
+                            writer.Write(pair.Value);
+                            writer.Write('\'');
+                            break;
+
+                        case DotEnvQuote.Backtick:
+                            writer.Write(pair.Name);
+                            writer.Write('=');
+                            writer.Write('`');
+                            writer.Write(pair.Value);
+                            writer.Write('`');
+                            break;
+                    }
+
                     break;
 
                 case DotEnvEmptyLine _:
@@ -135,63 +289,56 @@ internal static class Serializer
                     continue;
 
                 case EnvScalarToken scalarToken:
+                    var capture = scalarToken.Capture;
+
                     if (key is not null && key.Length > 0)
                     {
-                        if (doc.TryGetNameValuePair(key, out var entry) && entry is not null)
+                        DotEnvEntry? entry = null;
+
+                        if (doc.TryGetNameValuePair(key, out entry) && entry is not null)
                         {
                             entry.RawValue = scalarToken.RawValue;
                             key = null;
                             continue;
                         }
+                        else
+                        {
+                            entry = new DotEnvEntry(key, scalarToken.RawValue);
+                        }
 
-                        doc.Add(key, scalarToken.RawValue);
+                        switch (capture)
+                        {
+                            case Capture.DoubleQuote:
+                                entry.Quote = DotEnvQuote.Double;
+                                break;
+
+                            case Capture.SingleQuote:
+                                entry.Quote = DotEnvQuote.Single;
+                                break;
+
+                            case Capture.Backtick:
+                                entry.Quote = DotEnvQuote.Backtick;
+                                break;
+
+                            case Capture.Brackets:
+                                entry.Quote = DotEnvQuote.Json;
+                                break;
+
+                            case Capture.FrontMatter:
+                                entry.Quote = DotEnvQuote.Yaml;
+                                break;
+
+                            default:
+                                entry.Quote = DotEnvQuote.None;
+                                break;
+                        }
+
+                        doc.Add(entry);
                         key = null;
                         continue;
                     }
 
                     throw new InvalidOperationException("Scalar token found without a name token before it.");
-            }
-        }
-
-        bool expand = options.Expand;
-
-        if (expand)
-        {
-            Func<string, string?> getVariable = (name) => Env.Get(name);
-            if (options.ExpandVariables is not null)
-            {
-                var ev = options.ExpandVariables;
-                getVariable = (name) =>
-                {
-                    if (doc.TryGetValue(name, out var value))
-                        return value;
-
-                    if (ev.TryGetValue(name, out value))
-                        return value;
-
-                    value = Env.Get(name);
-
-                    return value;
-                };
-            }
-
-            var eso = new EnvExpandOptions()
-            {
-                UnixAssignment = false,
-                UnixCustomErrorMessage = false,
-                GetVariable = getVariable,
-                SetVariable = (name, value) => Env.Set(name, value),
-            };
-            foreach (var entry in doc)
-            {
-                if (entry is DotEnvEntry pair)
-                {
-                    var v = Env.Expand(pair.RawValue, eso);
-
-                    // Only set the value if it has changed.
-                    if (v.Length != pair.RawValue.Length || !v.SequenceEqual(pair.RawValue))
-                        pair.SetRawValue(v);
-                }
             }
         }
 

@@ -11,4 +11,5 @@ public enum EnvTokenType
     Number,
     Yaml,
     Json,
+    SubExpression,
 }

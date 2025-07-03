@@ -7,15 +7,13 @@
 
   <PropertyGroup>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageTags>Hyprx DotEnv VariableExpansion Expansion Env</PackageTags>
+    <PackageTags>Hyprx.DotEnv.Expansion</PackageTags>
     <Description>
-        An implementation of dotenv for parsing and writing .env files.
+        Hyprx.DotEnv.Expansion
     </Description>
     <PackageReleaseNotes Condition="Exists('$(MSBuildProjectDirectory)/CHANGELOG.md')">
       $([System.IO.File]::ReadAllText("$(MSBuildProjectDirectory)/CHANGELOG.md"))
     </PackageReleaseNotes>
-    <PackageLicenseFile Condition="Exists('$(LicensePath)')">LICENSE.md</PackageLicenseFile>
-    <PackageIcon>hyprx_logo_256.png</PackageIcon>
   </PropertyGroup>
 
   <ItemGroup>
@@ -31,18 +29,8 @@
     </AssemblyAttribute>
   </ItemGroup>
 
-  <ItemGroup Condition="'$(NetLegacy)' == 'true'">
-    <PackageReference Include="System.Memory" />
-    <PackageReference Include="Polyfill" />
+   <ItemGroup>
+    <ProjectReference Include="$(BclDir)/DotEnv/src/*.csproj" />
+    <ProjectReference Include="$(BclDir)/Secrets/src/*.csproj" />
   </ItemGroup>
-
-  <ItemGroup> 
-  </ItemGroup>
-
-  
-  <Target Name="Echo" BeforeTargets="Build">
-    <Message Text="Building Hyprx.DotEnv with BCL directory: $(BclDir)" Importance="high"/>
-    <Message Text="$(BclDir)/Core/src/*.csproj" Importance="high"/>
-  </Target>
-  
 </Project>

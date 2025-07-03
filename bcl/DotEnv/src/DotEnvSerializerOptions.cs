@@ -8,23 +8,15 @@ public class DotEnvSerializerOptions
 
     public bool AllowYaml { get; set; }
 
-    public bool Expand { get; set; } = true;
-
-    public IDictionary<string, string>? ExpandVariables { get; set; }
+    public bool AllowSubExpressions { get; set; } = false;
 
     public virtual object Clone()
     {
-        Dictionary<string, string>? expandVars = null;
-        if (this.ExpandVariables is not null)
-            expandVars = new Dictionary<string, string>(this.ExpandVariables);
-
         var copy = new DotEnvSerializerOptions()
         {
             AllowBackticks = this.AllowBackticks,
             AllowJson = this.AllowJson,
             AllowYaml = this.AllowYaml,
-            Expand = this.Expand,
-            ExpandVariables = expandVars,
         };
 
         return copy;

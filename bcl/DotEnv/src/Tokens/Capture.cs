@@ -8,4 +8,5 @@ internal enum Capture
     Brackets,
     Backtick,
     FrontMatter,
+    SubExpression,
 }

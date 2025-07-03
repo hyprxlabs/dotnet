@@ -1,5 +1,10 @@
 # Hyprx.DotEnv Changelog
 
+## 0.0.0-alpha.2
+
+Moved variable expansion to new library and remove dependency
+on Hyprx.Core.
+
 ## 0.0.0-alpha.0
 
 An implementation of dotenv for parsing and writing .env files.

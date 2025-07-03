@@ -222,6 +222,7 @@ public static class RexConsole
     public static async Task<int> RunTasksAsync(string[] args, RexConsoleOptions options, RexConsoleSettings settings, CancellationToken cancellationToken = default)
     {
         AnsiSettings.Current.Mode = AnsiMode.TwentyFourBit;
+        Console.WriteLine($"Ansi {AnsiSettings.Current.Mode}");
         ArgumentNullException.ThrowIfNull(options, nameof(options));
 
         ParseArgs(args, options);

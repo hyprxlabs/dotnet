@@ -36,7 +36,6 @@ public class DotEnvReader
             return false;
 
         bool keyTerminated = false;
-        bool valueTerminated = false;
 
         while (true)
         {
@@ -217,50 +216,117 @@ public class DotEnvReader
                             if (this.eof)
                             {
                                 this.tokenKind = TokenKind.None;
-                                var slice = this.buffer.ToArray();
-                                this.buffer.Clear();
-                                this.VisitScalarNode(slice);
+                                var slice = this.buffer.AsSpan();
+                                var pos = slice.Length - 1;
+                                var l = slice.Length;
+                                while (pos >= 0 && char.IsWhiteSpace(slice[pos]))
+                                {
+                                    pos--;
+                                    l--;
+                                }
+
+                                var array = slice.Slice(0, l).ToArray();
+                                if (array.Length > 0)
+                                {
+                                    this.VisitScalarNode(array);
+                                }
+
                                 return true;
                             }
 
-                            // if we've already terminated by whitespace.
-                            if (valueTerminated)
+                            // if we get a comment, then we're done.
+                            if (c is '#')
                             {
-                                // if we get a comment, then we're done.
-                                if (c is '#')
+                                this.tokenKind = TokenKind.Comment;
+                                var slice = this.buffer.AsSpan();
+                                var pos = slice.Length - 1;
+                                var l = slice.Length;
+                                while (pos >= 0 && char.IsWhiteSpace(slice[pos]))
                                 {
-                                    this.tokenKind = TokenKind.Comment;
-                                    var slice = this.buffer.ToArray();
-                                    this.buffer.Clear();
-                                    this.VisitScalarNode(slice);
-                                    return true;
+                                    pos--;
+                                    l--;
                                 }
 
-                                // whitespace is allowed after value;
-                                if (char.IsWhiteSpace(c))
+                                var array = slice.Slice(0, l).ToArray();
+                                if (array.Length > 0)
                                 {
-                                    continue;
+                                    this.VisitScalarNode(array);
                                 }
 
-                                throw new ParseException(
-                                    $"Unexpected character {c} after environment variable value was terminated with whitespace");
+                                this.buffer.Clear();
+                                return true;
                             }
 
-                            // terminate value
-                            if (char.IsWhiteSpace(c) && this.buffer.Length > 0)
-                            {
-                                valueTerminated = true;
-                                continue;
-                            }
-
-                            // append if not whitespace
                             this.buffer.Append(c);
                             continue;
                         }
 
+                        if (this.capture is Capture.DoubleQuote)
+                        {
+                            if (c is '\\')
+                            {
+                                var next = (char)this.reader.Peek();
+                                if (next is 'n' or 'r' or 't' or '\\' or '"' or '\'' or 'b')
+                                {
+
+                                    this.reader.Read();
+                                    if (next is 'n')
+                                        this.buffer.Append('\n');
+                                    else if (next is 'r')
+                                        this.buffer.Append('\r');
+                                    else if (next is 't')
+                                        this.buffer.Append('\t');
+                                    else if (next is 'b')
+                                        this.buffer.Append('\b');
+                                    else
+                                        this.buffer.Append(next);
+                                    continue;
+                                }
+
+                                if (next is 'u')
+                                {
+                                    var chars = new char[6];
+                                    chars[0] = (char)'\\';
+                                    chars[1] = (char)'u';
+                                    var i = 2;
+                                    this.reader.Read(); // consume 'u'
+
+                                    while (i < 6)
+                                    {
+                                        var c2 = (char)this.reader.Read();
+                                        if (char.IsDigit(c2) || (c2 >= 'a' && c2 <= 'f') || (c2 >= 'A' && c2 <= 'F'))
+                                        {
+                                            chars[i] = c2;
+                                            i++;
+                                            continue;
+                                        }
+                                        else
+                                        {
+                                            break;
+                                        }
+                                    }
+
+                                    if (i == 6)
+                                    {
+                                        var code = int.Parse(chars.AsSpan(2, 4), System.Globalization.NumberStyles.HexNumber);
+                                        this.buffer.Append((char)code);
+                                    }
+                                    else
+                                    {
+                                        this.buffer.Append(chars, 0, i);
+                                    }
+
+                                    continue;
+                                }
+
+                                this.buffer.Append(c);
+                                this.buffer.Append(next);
+                            }
+                        }
+
                         // if the multiline capture is terminated, then we're done.
                         if (this.HandleMultiLineCapture(c))
-                            return true;
+                                return true;
 
                         if (this.buffer.Length == 0 && char.IsWhiteSpace(c))
                             continue;
@@ -292,7 +358,7 @@ public class DotEnvReader
                     this.tokenKind = TokenKind.None;
                     var slice = this.buffer.ToArray();
                     this.buffer.Clear();
-                    this.Current = new EnvStringToken(slice, this.lineNumber, this.columnNumber);
+                    this.Current = new EnvStringToken(slice, this.lineNumber, this.columnNumber) { Capture = Capture.DoubleQuote };
                     this.Type = EnvTokenType.String;
                     return true;
                 }
@@ -313,7 +379,7 @@ public class DotEnvReader
                     this.Current = new EnvStringToken(
                         this.buffer.ToArray(),
                         this.lineNumber,
-                        this.columnNumber);
+                        this.columnNumber) { Capture = Capture.SingleQuote };
                     this.buffer.Clear();
                     this.Type = EnvTokenType.String;
                     return true;
@@ -336,7 +402,7 @@ public class DotEnvReader
                     this.Current = new EnvStringToken(
                         this.buffer.ToArray(),
                         this.lineNumber,
-                        this.columnNumber);
+                        this.columnNumber) { Capture = Capture.Backtick };
                     this.buffer.Clear();
                     this.Type = EnvTokenType.String;
                     return true;
@@ -353,7 +419,7 @@ public class DotEnvReader
                     this.Current = new EnvJsonToken(
                         this.buffer.ToArray(),
                         this.lineNumber,
-                        this.columnNumber);
+                        this.columnNumber) { Capture = Capture.Brackets };
                     this.buffer.Clear();
                     this.Type = EnvTokenType.Json;
                     return true;
@@ -389,7 +455,7 @@ public class DotEnvReader
                     this.Current = new EnvYamlToken(
                         this.buffer.ToArray(),
                         this.lineNumber,
-                        this.columnNumber);
+                        this.columnNumber) { Capture = Capture.FrontMatter };
                     this.buffer.Clear();
                     this.Type = EnvTokenType.Yaml;
                     return true;
@@ -468,7 +534,21 @@ public class DotEnvReader
                     throw new ParseException($"Unexpected scalar token on {this.lineNumber} at {this.columnNumber}, missing name");
                 }
 
-                this.VisitScalarNode(slice);
+                var buf = slice.AsSpan();
+                var l = buf.Length;
+                var pos = l - 1;
+                while (pos >= 0 && char.IsWhiteSpace(buf[pos]))
+                {
+                    pos--;
+                    l--;
+                }
+
+                if (l > 0)
+                {
+                    slice = buf.Slice(0, l).ToArray();
+                    this.VisitScalarNode(slice);
+                }
+
                 this.tokenKind = TokenKind.None;
                 return true;
         }
@@ -500,7 +580,9 @@ public class DotEnvReader
             return;
         }
 
-        this.Current = new EnvStringToken(slice, this.lineNumber, this.columnNumber);
+        var token = new EnvStringToken(slice, this.lineNumber, this.columnNumber);
+        token.Capture = this.capture;
         this.Type = EnvTokenType.String;
+        this.Current = token;
     }
 }
