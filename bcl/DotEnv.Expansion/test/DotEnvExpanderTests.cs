@@ -87,5 +87,6 @@ SECRET2=$(secret akv:///kv-hyprx-tmp/secret2)
         Assert.Equal(home, env["MY_HOME2"]);
         Assert.Equal("/default/home", env["MY_HOME3"]);
         Assert.Equal("I am GROOT", env["SECRET1"]);
+        Assert.Equal("$(secret akv:///kv-hyprx-tmp/secret2)", env["SECRET2"]);
     }
 }
