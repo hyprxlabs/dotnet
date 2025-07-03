@@ -68,16 +68,19 @@ public class DotEnvEntry : DotEnvNode
 
     public void SetRawValue(char[] value)
     {
+        this.value = null; // Reset cached value
         this.RawValue = value;
     }
 
     public void SetRawValue(ReadOnlySpan<char> value)
     {
+        this.value = null; // Reset cached value
         this.RawValue = value.ToArray();
     }
 
     public void SetRawValue(EnvScalarToken token)
     {
+        this.value = null; // Reset cached value
         this.RawValue = token.RawValue;
     }
 

@@ -4,9 +4,9 @@ public class ExpansionResult
 {
     public string Value { get; set; } = string.Empty;
 
-    public bool IsOk { get; internal protected set; } = true;
+    public bool IsOk => this.Error is null;
 
-    public bool IsError => !this.IsOk;
+    public bool IsError => this.Error is not null;
 
     public Exception? Error { get; set; }
 

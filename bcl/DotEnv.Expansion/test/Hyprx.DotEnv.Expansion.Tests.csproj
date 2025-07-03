@@ -26,4 +26,9 @@
     <PackageReference Include="xunit.runner.visualstudio" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="$(BclDir)/DotEnv.Expansion/src/*.csproj" />
+    <ProjectReference Include="$(BclDir)/Exec/src/*.csproj" />
+  </ItemGroup>
+
 </Project>

@@ -30,7 +30,21 @@ public class DotEnvDocument : IEnumerable<DotEnvNode>,
     public DotEnvNode this[int index]
     {
         get => this.entries[index];
-        set => this.entries[index] = value;
+        set
+        {
+            this.entries[index] = value;
+            if (value is DotEnvEntry nameValuePair)
+            {
+                if (this.nameValuePairs.ContainsKey(nameValuePair.Name))
+                {
+                    this.nameValuePairs[nameValuePair.Name] = nameValuePair;
+                }
+                else
+                {
+                    this.nameValuePairs.Add(nameValuePair.Name, nameValuePair);
+                }
+            }
+        }
     }
 
     string IReadOnlyDictionary<string, string>.this[string name]

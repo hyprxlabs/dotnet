@@ -22,21 +22,17 @@ public class DotEnvExpander
     {
         var summary = new ExpansionSummary(document);
 
-        var copy = new DotEnvDocument();
-        foreach (var entry in document)
-        {
-            copy.Add(entry);
-        }
+        var l = document.Count;
 
-        for (var i = 0; i < copy.Count; i++)
+        for (var i = 0; i < l; i++)
         {
-            var node = copy[i];
+            var node = document[i];
             if (node is DotEnvEntry entry)
             {
                 var result = await ExpandValueAsync(document, i, this.options, cancellationToken);
                 if (result.IsOk)
                 {
-                    document[i] = new DotEnvEntry(entry.Name, result.Value);
+                    entry.SetRawValue(result.Value);
                     continue;
                 }
 
@@ -59,21 +55,16 @@ public class DotEnvExpander
     {
         var summary = new ExpansionSummary(document);
 
-        var copy = new DotEnvDocument();
-        foreach (var entry in document)
+        var l = document.Count;
+        for (var i = 0; i < l; i++)
         {
-            copy.Add(entry);
-        }
-
-        for (var i = 0; i < copy.Count; i++)
-        {
-            var node = copy[i];
+            var node = document[i];
             if (node is DotEnvEntry entry)
             {
                 var result = ExpandValue(document, i, this.options);
                 if (result.IsOk)
                 {
-                    document[i] = new DotEnvEntry(entry.Name, result.Value);
+                    entry.SetRawValue(result.Value);
                     continue;
                 }
 
@@ -122,7 +113,6 @@ public class DotEnvExpander
             return new ExpansionResult
             {
                 Value = string.Empty,
-                IsOk = true,
                 Position = 0,
             };
         }
@@ -261,37 +251,47 @@ public class DotEnvExpander
                 var args = SecretExpression.ParseArgs(expression);
                 if (args.Count > 0 && args[0] == "secret")
                 {
-                    foreach (var expander in o.SecretVaultExpanders)
+                    if (o.SecretVaultExpanders.Count == 0)
                     {
-                        try
+                        return new ExpansionResult
                         {
-                            if (!expander.CanHandle(expression))
-                                continue;
+                            Value = template,
+                            Position = i,
+                            Error = new Exception("No secret vault expanders configured."),
+                        };
+                    }
 
-                            var result = await expander.ExpandAsync(expression, cancellationToken);
-                            if (result.IsOk)
+                    foreach (var expander in o.SecretVaultExpanders)
+                        {
+                            try
                             {
-                                output.Append(result.Value);
-                                break;
+                                if (!expander.CanHandle(expression))
+                                    continue;
+
+                                var result = await expander.ExpandAsync(expression, cancellationToken);
+                                if (result.IsOk)
+                                {
+                                    output.Append(result.Value);
+                                    break;
+                                }
+                                else
+                                {
+                                    return new ExpansionResult
+                                    {
+                                        Error = result.Error,
+                                        Position = i,
+                                    };
+                                }
                             }
-                            else
+                            catch (Exception ex)
                             {
                                 return new ExpansionResult
                                 {
-                                    Error = result.Error,
+                                    Error = ex,
                                     Position = i,
                                 };
                             }
                         }
-                        catch (Exception ex)
-                        {
-                            return new ExpansionResult
-                            {
-                                Error = ex,
-                                Position = i,
-                            };
-                        }
-                    }
                 }
 
                 if (o.EnableShell)
@@ -581,7 +581,6 @@ public class DotEnvExpander
         return new ExpansionResult
         {
             Value = value,
-            IsOk = true,
             Position = 0,
         };
     }
@@ -607,7 +606,6 @@ public class DotEnvExpander
             return new ExpansionResult
             {
                 Value = string.Empty,
-                IsOk = true,
                 Position = 0,
             };
         }
@@ -746,6 +744,16 @@ public class DotEnvExpander
                 var args = SecretExpression.ParseArgs(expression);
                 if (args.Count > 0 && args[0] == "secret")
                 {
+                    if (o.SecretVaultExpanders.Count == 0)
+                    {
+                        return new ExpansionResult
+                        {
+                            Value = template,
+                            Error = new Exception("No secret vault expanders configured."),
+                            Position = i,
+                        };
+                    }
+
                     foreach (var expander in o.SecretVaultExpanders)
                     {
                         try
@@ -1072,7 +1080,6 @@ public class DotEnvExpander
         return new ExpansionResult
         {
             Value = value,
-            IsOk = true,
             Position = 0,
         };
     }
