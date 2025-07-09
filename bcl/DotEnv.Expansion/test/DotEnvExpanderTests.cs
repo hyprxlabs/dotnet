@@ -55,7 +55,7 @@ SECRET2=$(secret akv:///kv-hyprx-tmp/secret2)
             Assert.Skip("Azure CLI (az) is not installed.");
         }
 
-        var az = new Command(azPath);
+        var az = new Command($"\"{azPath}\"");
 
         var o1 = az.Run(["account", "list-locations"]);
 
