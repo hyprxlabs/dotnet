@@ -149,6 +149,10 @@ public class DotEnvExpander
             doc.Add(new DotEnvEntry(name, value));
         }
 
+        var tmpPrefix = o.SecretsExpression.AsSpan().Trim();
+        var secretPrefix = new char[tmpPrefix.Length + 1];
+        tmpPrefix.CopyTo(secretPrefix);
+
         var tokenBuilder = StringBuilderCache.Acquire();
         var output = StringBuilderCache.Acquire();
         var kind = TokenKind.None;
@@ -192,13 +196,59 @@ public class DotEnvExpander
                         continue;
                     }
 
-                    if (o.EnableSubExpressions && next is '(' && remaining > 3)
+                    if (o.EnableCommandSubstitution && next is '(' && remaining > 3)
                     {
                         lastTokenStartIndex = i;
                         kind = TokenKind.Expression;
                         i++;
                         remaining--;
                         continue;
+                    }
+
+                    var k = z + 1;
+                    if (o.EnableSecretSubstitution && next is '(')
+                    {
+                        var match = false;
+                        var y = 0;
+
+                        while (k < template.Length && template[k] is not ')')
+                        {
+                            var nextChar = template[k];
+
+                            // skip whitespace at the start of the secret expression.
+                            if (y == 0 && char.IsWhiteSpace(nextChar))
+                            {
+                                k++;
+                                continue;
+                            }
+
+                            // if the the non-whitespace character does not match the secret prefix
+                            // then we don't have a match.
+                            var targetChar = secretPrefix[y];
+                            if (nextChar != targetChar)
+                            {
+                                match = false;
+                                break;
+                            }
+
+                            y++;
+                            k++;
+
+                            // once we have matched the entire secret prefix, we can stop checking.
+                            if (y >= secretPrefix.Length)
+                            {
+                                match = true;
+                                break;
+                            }
+                        }
+
+                        if (match && k < template.Length)
+                        {
+                            // we have a match, so we can treat this as a secret substitution.
+                            lastTokenStartIndex = i;
+                            kind = TokenKind.Expression;
+                            continue;
+                        }
                     }
 
                     // only a variable if the next character is a letter.
@@ -247,10 +297,17 @@ public class DotEnvExpander
                 var expression = tokenBuilder.ToString();
                 tokenBuilder.Clear();
                 kind = TokenKind.None;
-
                 var args = SecretExpression.ParseArgs(expression);
-                if (args.Count > 0 && args[0] == "secret")
+
+                var vaultExpanderHandled = false;
+                if (args.Count > 0 && args[0].Equals(o.SecretsExpression, StringComparison.OrdinalIgnoreCase))
                 {
+                    if (!o.EnableSecretSubstitution)
+                    {
+                        output.Append($"$({expression})");
+                        continue;
+                    }
+
                     if (o.SecretVaultExpanders.Count == 0)
                     {
                         return new ExpansionResult
@@ -262,41 +319,54 @@ public class DotEnvExpander
                     }
 
                     foreach (var expander in o.SecretVaultExpanders)
+                    {
+                        try
                         {
-                            try
-                            {
-                                if (!expander.CanHandle(args))
-                                    continue;
+                            if (!expander.CanHandle(args))
+                                continue;
 
-                                var result = await expander.ExpandAsync(args, cancellationToken);
-                                if (result.IsOk)
-                                {
-                                    output.Append(result.Value);
-                                    break;
-                                }
-                                else
-                                {
-                                    return new ExpansionResult
-                                    {
-                                        Error = result.Error,
-                                        Position = i,
-                                    };
-                                }
+                            var result = await expander.ExpandAsync(args, cancellationToken);
+                            if (result.IsOk)
+                            {
+                                output.Append(result.Value);
+                                vaultExpanderHandled = true;
+                                break;
                             }
-                            catch (Exception ex)
+                            else
                             {
                                 return new ExpansionResult
                                 {
-                                    Error = ex,
+                                    Error = result.Error,
                                     Position = i,
                                 };
                             }
                         }
+                        catch (Exception ex)
+                        {
+                            return new ExpansionResult
+                            {
+                                Error = ex,
+                                Position = i,
+                            };
+                        }
+                    }
                 }
 
-                if (o.EnableShell)
+                // expression has been handled by a vault expander.
+                if (vaultExpanderHandled)
                 {
-                    var shell = o.Shell;
+                    continue;
+                }
+
+                if (!o.EnableCommandSubstitution)
+                {
+                    output.Append($"$({expression})");
+                    continue;
+                }
+
+                if (o.EnableShellExecution)
+                {
+                    var shell = o.UseShell;
                     if (string.IsNullOrEmpty(shell))
                     {
                         shell = "bash";
@@ -374,6 +444,8 @@ public class DotEnvExpander
                     var stdout = await process.StandardOutput.ReadToEndAsync();
                     output.Append(stdout.Trim());
                 }
+
+                continue;
             }
 
             if (kind == TokenKind.BashInterpolation && c is '}')
@@ -642,6 +714,11 @@ public class DotEnvExpander
             doc.Add(new DotEnvEntry(name, value));
         }
 
+        var temp = o.SecretsExpression.AsSpan().Trim();
+        Span<char> secretPrefix = stackalloc char[temp.Length + 1];
+        temp.CopyTo(secretPrefix);
+        secretPrefix[temp.Length - 1] = ' '; // expression must end with a space.
+
         var tokenBuilder = StringBuilderCache.Acquire();
         var output = StringBuilderCache.Acquire();
         var kind = TokenKind.None;
@@ -685,13 +762,59 @@ public class DotEnvExpander
                         continue;
                     }
 
-                    if (o.EnableSubExpressions && next is '(' && remaining > 3)
+                    if (o.EnableCommandSubstitution && next is '(' && remaining > 3)
                     {
                         lastTokenStartIndex = i;
                         kind = TokenKind.Expression;
                         i++;
                         remaining--;
                         continue;
+                    }
+
+                    var k = z + 1;
+                    if (o.EnableSecretSubstitution && next is '(')
+                    {
+                        var match = false;
+                        var y = 0;
+
+                        while (k < template.Length && template[k] is not ')')
+                        {
+                            var nextChar = template[k];
+
+                            // skip whitespace at the start of the secret expression.
+                            if (y == 0 && char.IsWhiteSpace(nextChar))
+                            {
+                                k++;
+                                continue;
+                            }
+
+                            // if the the non-whitespace character does not match the secret prefix
+                            // then we don't have a match.
+                            var targetChar = secretPrefix[y];
+                            if (nextChar != targetChar)
+                            {
+                                match = false;
+                                break;
+                            }
+
+                            y++;
+                            k++;
+
+                            // once we have matched the entire secret prefix, we can stop checking.
+                            if (y >= secretPrefix.Length)
+                            {
+                                match = true;
+                                break;
+                            }
+                        }
+
+                        if (match && k < template.Length)
+                        {
+                            // we have a match, so we can treat this as a secret substitution.
+                            lastTokenStartIndex = i;
+                            kind = TokenKind.Expression;
+                            continue;
+                        }
                     }
 
                     // only a variable if the next character is a letter.
@@ -743,8 +866,16 @@ public class DotEnvExpander
 
                 var args = SecretExpression.ParseArgs(expression);
                 var vaultExpanderHandled = false;
-                if (args.Count > 0 && args[0] == "secret")
+                if (args.Count > 0 && args[0].EqualsFold(o.SecretsExpression))
                 {
+                    // if we match the secrets expression, we need to handle it specially.
+                    // so that it does not get executed as a command that doesn't exist.
+                    if (!o.EnableSecretSubstitution)
+                    {
+                        output.Append($"$({expression})");
+                        continue;
+                    }
+
                     if (o.SecretVaultExpanders.Count == 0)
                     {
                         return new ExpansionResult
@@ -796,9 +927,15 @@ public class DotEnvExpander
                     continue;
                 }
 
-                if (o.EnableShell)
+                if (!o.EnableCommandSubstitution)
                 {
-                    var shell = o.Shell;
+                    output.Append($"$({expression})");
+                    continue;
+                }
+
+                if (o.EnableShellExecution)
+                {
+                    var shell = o.UseShell;
                     if (string.IsNullOrEmpty(shell))
                     {
                         shell = "bash";
@@ -855,8 +992,8 @@ public class DotEnvExpander
                         FileName = exe,
                     };
 
-                    si.UseShellExecute = o.EnableShell;
-                    if (!o.EnableShell)
+                    si.UseShellExecute = o.EnableShellExecution;
+                    if (!o.EnableShellExecution)
                     {
                         foreach (var arg in args)
                         {
@@ -883,8 +1020,6 @@ public class DotEnvExpander
                     output.Append(stdout);
                 }
 
-                kind = TokenKind.None;
-                tokenBuilder.Clear();
                 continue;
             }
 

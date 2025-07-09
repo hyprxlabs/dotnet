@@ -8,12 +8,12 @@ This library can:
 
 - perserve the order of the environment variables defined in the file.
 - can parse and write comments.
-- can load multiple files and expand the environment variables.
+- can load multiple files.
 - can handle extra parsing features such as json, yaml, and bacticks.  
 - avoids reflection to help with AOT scenarios.
 
 For variable and command subsitution use the "Hyprx.DotEnv.Expansion" library
-which can perform variable and command subusitution.
+which can perform variable expansion and command subusitution.
 
 ## Usage
 
@@ -51,10 +51,12 @@ Console.WriteLine(content);
 // 
 // # NODE VARS
 // NODE_ENV=production
+// OTHER_VAR=test
 var doc2 = new DotEnvDocument();
 doc2.AddEmptyLine();
 doc2.AddComment("NODE VARS");
 doc2.Add("NODE_ENV", "production");
+doc2["OTHER_VAR"] = "test";
 
 var content2 = DotEnvSerializer.SerializeDocument(doc);
 Console.WriteLine(content2);

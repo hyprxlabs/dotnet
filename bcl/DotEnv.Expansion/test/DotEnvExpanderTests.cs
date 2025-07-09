@@ -71,15 +71,10 @@ SECRET2=$(secret akv:///kv-hyprx-tmp/secret2)
 
         var home = Environment.GetEnvironmentVariable("HOME");
         var expander = new ExpansionBuilder()
-            .WithExpressions()
+            .WithCommandSubstitution()
             .Build();
         var env = DotEnvSerializer.DeserializeDocument(s_defaultEnv);
         var summary = expander.Expand(env);
-
-        Assert.NotNull(summary);
-        Assert.True(summary.IsError);
-        Assert.True(summary.Errors.Count is 1);
-        Assert.Equal("No secret vault expanders configured.", summary.Errors[0].Message);
 
         env = summary.Value;
         Assert.Equal("normal value", env["NORMAL_VAR"]);

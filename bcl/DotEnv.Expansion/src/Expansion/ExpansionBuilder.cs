@@ -15,22 +15,28 @@ public class ExpansionBuilder
         return this;
     }
 
-    public ExpansionBuilder WithWindowsExpansion(bool enable = true)
+    public ExpansionBuilder WithWindowsVariableExpansion(bool enable = true)
     {
         this.options.EnableWindowsVariables = enable;
         return this;
     }
 
-    public ExpansionBuilder WithExpressions(bool enable = true)
+    public ExpansionBuilder WithCommandSubstitution(bool enable = true)
     {
-        this.options.EnableSubExpressions = enable;
+        this.options.EnableCommandSubstitution = enable;
         return this;
     }
 
-    public ExpansionBuilder WithShell(bool enable = true, string shell = "bash")
+    public ExpansionBuilder WithSecretSubstitution(bool enable = true)
     {
-        this.options.EnableShell = enable;
-        this.options.Shell = shell;
+        this.options.EnableSecretSubstitution = enable;
+        return this;
+    }
+
+    public ExpansionBuilder WithEnableShell(bool enable = true, string shell = "bash")
+    {
+        this.options.EnableShellExecution = enable;
+        this.options.UseShell = shell;
         return this;
     }
 
@@ -54,6 +60,7 @@ public class ExpansionBuilder
 
     public ExpansionBuilder AddSecretVaultExpander(ISecretVaultExpander expander)
     {
+        this.options.EnableSecretSubstitution = true;
         if (expander == null)
             throw new ArgumentNullException(nameof(expander));
 
@@ -61,17 +68,18 @@ public class ExpansionBuilder
         return this;
     }
 
-    public ExpansionBuilder AddAzureCliKeyVault(Action<AzCliKeyVaultExpander>? configure = null)
+    public ExpansionBuilder AddAzCliKeyVaultExpander(Action<AzCliKeyVaultExpander>? configure = null)
     {
+        this.options.EnableSecretSubstitution = true;
         var expander = new AzCliKeyVaultExpander();
         configure?.Invoke(expander);
         this.AddSecretVaultExpander(expander);
         return this;
     }
 
-    public ExpansionBuilder AddSopsCliAgeEnv(Action<SopsCliAgeEnvExpander>? configure = null)
+    public ExpansionBuilder AddSopsEnvExpander(Action<SopsEnvExpander>? configure = null)
     {
-        var expander = new SopsCliAgeEnvExpander();
+        var expander = new SopsEnvExpander();
         configure?.Invoke(expander);
         this.AddSecretVaultExpander(expander);
         return this;

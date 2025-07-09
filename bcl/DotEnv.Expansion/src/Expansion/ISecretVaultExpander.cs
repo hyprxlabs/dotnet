@@ -10,6 +10,8 @@ public interface ISecretVaultExpander
 
     bool Synchronous { get; }
 
+    bool IsDefault { get; }
+
     ExpansionResult Expand(IList<string> args);
 
     Task<ExpansionResult> ExpandAsync(

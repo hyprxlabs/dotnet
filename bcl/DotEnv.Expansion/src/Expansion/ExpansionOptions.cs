@@ -6,11 +6,13 @@ public class ExpansionOptions
 
     public bool EnableWindowsVariables { get; set; } = false;
 
-    public bool EnableSubExpressions { get; set; } = false;
+    public bool EnableCommandSubstitution { get; set; } = false;
 
-    public bool EnableShell { get; set; } = false;
+    public bool EnableSecretSubstitution { get; set; } = false;
 
-    public string Shell { get; set; } = "bash";
+    public bool EnableShellExecution { get; set; } = false;
+
+    public string UseShell { get; set; } = "bash";
 
     public string SecretsExpression { get; set; } = "secret";
 

@@ -77,6 +77,7 @@ TEST=hello_world
                 Console.WriteLine(node.Value);
             }
         }
+
         Assert.NotNull(env);
         Assert.Equal(2, env.Count);
         Assert.Equal("hello_world", env["TEST"]);

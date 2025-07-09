@@ -2,25 +2,77 @@ using System.Collections.Concurrent;
 
 namespace Hyprx.DotEnv.Expansion;
 
-public class SopsCliAgeEnvExpander : ISecretVaultExpander
+public class SopsEnvExpander : ISecretVaultExpander
 {
     private readonly ConcurrentDictionary<string, Dictionary<string, string>> envFiles = new();
 
     private readonly SemaphoreSlim semaphore = new(1, 1);
 
-    public string Name => "sops-cli-age-env";
+    private string? envPath;
+
+    public string Name => "sops-env";
 
     public string SecretsExpression { get; set; } = "secret";
 
-    public string Protocol { get; set; } = "sops-age-env";
+    public string Protocol { get; set; } = "sops-env";
 
-    public string? EnvPath { get; set; } = null;
+    public string? EnvPath
+    {
+        get => this.envPath;
+
+        set
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                this.envPath = null;
+                return;
+            }
+
+            if (value[0] == '~')
+            {
+                value = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), value[1..]);
+                return;
+            }
+
+            if (value.Contains("$PWD") || value.Contains("$CWD"))
+            {
+                this.envPath = value;
+            }
+
+            if (!Path.IsPathFullyQualified(value))
+            {
+                value = Path.GetFullPath(value);
+            }
+
+            value = value.Replace('\\', '/');
+        }
+    }
 
     public string? SopsConfigPath { get; set; } = null;
 
     public string? AgeKeyFile { get; set; } = null;
 
     public string? AgeKey { get; set; } = null;
+
+    public string? AgeRecipients { get; set; } = null;
+
+    public string? WorkingDirectory { get; set; } = null;
+
+    public bool IsDefault { get; set; } = false;
+
+    protected string? DefaultUri
+    {
+        get
+        {
+            if (!this.IsDefault)
+                return null;
+
+            if (this.EnvPath is null)
+                return null;
+
+            return $"{this.Protocol}:///{this.EnvPath}";
+        }
+    }
 
     public bool CanHandle(IList<string> expressions)
     {
@@ -32,7 +84,12 @@ public class SopsCliAgeEnvExpander : ISecretVaultExpander
         if (!expressions[0].EqualsFold(this.SecretsExpression))
             return false;
 
-        if (!string.IsNullOrWhiteSpace(this.EnvPath))
+        if (this.IsDefault && expressions[1] == "default" && this.EnvPath is not null)
+        {
+            return true;
+        }
+
+        if (this.EnvPath is not null)
         {
             return expressions[1].StartsWith($"{this.Protocol}:///{this.EnvPath}", StringComparison.OrdinalIgnoreCase);
         }
@@ -44,7 +101,7 @@ public class SopsCliAgeEnvExpander : ISecretVaultExpander
 
     public ExpansionResult Expand(IList<string> args)
     {
-        var (expression, error) = SecretExpression.Parse(args);
+        var (expression, error) = SecretExpression.Parse(args, this.SecretsExpression, this.WorkingDirectory, this.DefaultUri);
         if (error is not null)
         {
             return new ExpansionResult()
@@ -85,6 +142,8 @@ public class SopsCliAgeEnvExpander : ISecretVaultExpander
             var nv = System.Web.HttpUtility.ParseQueryString(query);
             name = nv["name"] ?? string.Empty;
         }
+
+        name = Convert(name);
 
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -128,7 +187,7 @@ public class SopsCliAgeEnvExpander : ISecretVaultExpander
 
     public async Task<ExpansionResult> ExpandAsync(IList<string> args, CancellationToken cancellationToken = default)
     {
-        var (expression, error) = SecretExpression.Parse(args);
+        var (expression, error) = SecretExpression.Parse(args, this.SecretsExpression, this.WorkingDirectory, this.DefaultUri);
         if (error is not null)
         {
             return new ExpansionResult()
@@ -170,6 +229,8 @@ public class SopsCliAgeEnvExpander : ISecretVaultExpander
             name = nv["name"] ?? string.Empty;
         }
 
+        name = Convert(name);
+
         if (string.IsNullOrWhiteSpace(name))
         {
             return new ExpansionResult()
@@ -210,6 +271,35 @@ public class SopsCliAgeEnvExpander : ISecretVaultExpander
         };
     }
 
+    private static string Convert(string value)
+    {
+        var builder = StringBuilderCache.Acquire();
+        var previous = char.MinValue;
+        foreach (var c in value)
+        {
+            if (c is '-' or ' ' or '_' or '.' or '/' or ':' or '\\')
+            {
+                if (builder.Length == 0)
+                {
+                    continue; // Skip leading separators
+                }
+
+                builder.Append('_');
+                previous = '_';
+                continue;
+            }
+
+            if (!char.IsLetterOrDigit(c))
+                continue;
+
+            var n = char.ToUpperInvariant(c);
+            builder.Append(n);
+            previous = n;
+        }
+
+        return StringBuilderCache.GetStringAndRelease(builder);
+    }
+
     private (string? Secret, Exception? Error) GenerateAndEncrypt(
         SecretExpression expression,
         Dictionary<string, string> envFile,
@@ -220,9 +310,13 @@ public class SopsCliAgeEnvExpander : ISecretVaultExpander
             return (null, new OperationCanceledException("Operation was canceled."));
         }
 
+        if (expression.Name is null)
+            return (null, new ArgumentException("The secret name is required."));
+
         try
         {
             this.semaphore.Wait();
+            var name = Convert(expression.Name);
             var password = expression.Generate();
             var path = expression.Uri.LocalPath;
             if (string.IsNullOrWhiteSpace(path))
@@ -241,22 +335,48 @@ public class SopsCliAgeEnvExpander : ISecretVaultExpander
 
             var args = new List<string>();
             var env = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            var ageKeyFile = this.AgeKeyFile;
+            var recipients = this.AgeRecipients;
             var sopsConfig = this.SopsConfigPath;
 
             var nv = System.Web.HttpUtility.ParseQueryString(expression.Uri.Query);
             if (nv.Count > 0)
             {
-                var value = nv["age-key-file"];
+                var value = nv["age-recipients"];
                 if (!string.IsNullOrWhiteSpace(value))
                 {
-                    ageKeyFile = value;
+                    recipients = value;
                 }
 
                 value = nv["sops-config"];
                 if (!string.IsNullOrWhiteSpace(value))
                 {
                     sopsConfig = value;
+                }
+            }
+
+            if (expression.Tokens.Contains("--age-recipients"))
+            {
+                var index = expression.Tokens.IndexOf("--age-recipients");
+                if (index >= 0 && index + 1 < expression.Tokens.Count)
+                {
+                    var value = expression.Tokens[index + 1];
+                    if (!value.StartsWith("-"))
+                    {
+                        recipients = value;
+                    }
+                }
+            }
+
+            if (expression.Tokens.Contains("--sops-config"))
+            {
+                var index = expression.Tokens.IndexOf("--sops-config");
+                if (index >= 0 && index + 1 < expression.Tokens.Count)
+                {
+                    var value = expression.Tokens[index + 1];
+                    if (!value.StartsWith("-"))
+                    {
+                        sopsConfig = value;
+                    }
                 }
             }
 
@@ -272,9 +392,9 @@ public class SopsCliAgeEnvExpander : ISecretVaultExpander
                 }
             }
 
-            if (!string.IsNullOrWhiteSpace(ageKeyFile))
+            if (!string.IsNullOrWhiteSpace(recipients))
             {
-                env["SOPS_AGE_KEY_FILE"] = ageKeyFile;
+                env["SOPS_AGE_RECIPIENTS"] = recipients;
             }
 
             if (!string.IsNullOrWhiteSpace(sopsConfig))
@@ -283,6 +403,7 @@ public class SopsCliAgeEnvExpander : ISecretVaultExpander
                 args.Add(sopsConfig);
             }
 
+            envFile[name] = password;
             var content = DotEnvSerializer.SerializeDictionary(envFile);
             if (string.IsNullOrWhiteSpace(content))
             {
@@ -309,6 +430,11 @@ public class SopsCliAgeEnvExpander : ISecretVaultExpander
                 args.Add("-i");
                 args.Add("-e");
                 args.Add(path);
+
+                foreach (var arg in args)
+                {
+                    si.ArgumentList.Add(arg);
+                }
 
                 var process = new System.Diagnostics.Process
                 {
@@ -365,9 +491,13 @@ public class SopsCliAgeEnvExpander : ISecretVaultExpander
             return (null, new OperationCanceledException("Operation was canceled."));
         }
 
+        if (expression.Name is null)
+            return (null, new ArgumentException("The secret name is required."));
+
         try
         {
             await this.semaphore.WaitAsync(cancellationToken);
+            var name = Convert(expression.Name);
             var password = expression.Generate();
             var path = expression.Uri.LocalPath;
             if (string.IsNullOrWhiteSpace(path))
@@ -386,22 +516,48 @@ public class SopsCliAgeEnvExpander : ISecretVaultExpander
 
             var args = new List<string>();
             var env = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            var ageKeyFile = this.AgeKeyFile;
+            var recipients = this.AgeRecipients;
             var sopsConfig = this.SopsConfigPath;
 
             var nv = System.Web.HttpUtility.ParseQueryString(expression.Uri.Query);
             if (nv.Count > 0)
             {
-                var value = nv["age-key-file"];
+                var value = nv["age-recipients"];
                 if (!string.IsNullOrWhiteSpace(value))
                 {
-                    ageKeyFile = value;
+                    recipients = value;
                 }
 
                 value = nv["sops-config"];
                 if (!string.IsNullOrWhiteSpace(value))
                 {
                     sopsConfig = value;
+                }
+            }
+
+            if (expression.Tokens.Contains("--age-recipients"))
+            {
+                var index = expression.Tokens.IndexOf("--age-recipients");
+                if (index >= 0 && index + 1 < expression.Tokens.Count)
+                {
+                    var value = expression.Tokens[index + 1];
+                    if (!value.StartsWith("-"))
+                    {
+                        recipients = value;
+                    }
+                }
+            }
+
+            if (expression.Tokens.Contains("--sops-config"))
+            {
+                var index = expression.Tokens.IndexOf("--sops-config");
+                if (index >= 0 && index + 1 < expression.Tokens.Count)
+                {
+                    var value = expression.Tokens[index + 1];
+                    if (!value.StartsWith("-"))
+                    {
+                        sopsConfig = value;
+                    }
                 }
             }
 
@@ -417,9 +573,9 @@ public class SopsCliAgeEnvExpander : ISecretVaultExpander
                 }
             }
 
-            if (!string.IsNullOrWhiteSpace(ageKeyFile))
+            if (!string.IsNullOrWhiteSpace(recipients))
             {
-                env["SOPS_AGE_KEY_FILE"] = ageKeyFile;
+                env["SOPS_AGE_RECIPIENTS"] = recipients;
             }
 
             if (!string.IsNullOrWhiteSpace(sopsConfig))
@@ -428,6 +584,7 @@ public class SopsCliAgeEnvExpander : ISecretVaultExpander
                 args.Add(sopsConfig);
             }
 
+            envFile[name] = password;
             var content = DotEnvSerializer.SerializeDictionary(envFile);
             if (string.IsNullOrWhiteSpace(content))
             {
@@ -454,6 +611,11 @@ public class SopsCliAgeEnvExpander : ISecretVaultExpander
                 args.Add("-i");
                 args.Add("-e");
                 args.Add(path);
+
+                foreach (var arg in args)
+                {
+                    si.ArgumentList.Add(arg);
+                }
 
                 var process = new System.Diagnostics.Process
                 {
@@ -534,6 +696,7 @@ public class SopsCliAgeEnvExpander : ISecretVaultExpander
             var env = new Dictionary<string, string>();
             var query = expression.Uri.Query;
             var ageKeyFile = this.AgeKeyFile;
+            var ageKey = this.AgeKey;
             var sopsConfig = this.SopsConfigPath;
 
             if (!string.IsNullOrWhiteSpace(query))
@@ -545,6 +708,12 @@ public class SopsCliAgeEnvExpander : ISecretVaultExpander
                     ageKeyFile = value;
                 }
 
+                value = nv["age-key"];
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    ageKey = Environment.GetEnvironmentVariable(value);
+                }
+
                 value = nv["sops-config"];
                 if (!string.IsNullOrWhiteSpace(value))
                 {
@@ -552,9 +721,53 @@ public class SopsCliAgeEnvExpander : ISecretVaultExpander
                 }
             }
 
+            if (expression.Tokens.Contains("--age-key-file"))
+            {
+                var index = expression.Tokens.IndexOf("--age-key-file");
+                if (index >= 0 && index + 1 < expression.Tokens.Count)
+                {
+                    var value = expression.Tokens[index + 1];
+                    if (!value.StartsWith("-"))
+                    {
+                        ageKeyFile = value;
+                    }
+                }
+            }
+
+            if (expression.Tokens.Contains("--age-key"))
+            {
+                var index = expression.Tokens.IndexOf("--age-key");
+                if (index >= 0 && index + 1 < expression.Tokens.Count)
+                {
+                    var value = expression.Tokens[index + 1];
+                    if (!value.StartsWith("-"))
+                    {
+                        ageKey = Environment.GetEnvironmentVariable(value);
+                    }
+                }
+            }
+
+            if (expression.Tokens.Contains("--sops-config"))
+            {
+                var index = expression.Tokens.IndexOf("--sops-config");
+                if (index >= 0 && index + 1 < expression.Tokens.Count)
+                {
+                    var value = expression.Tokens[index + 1];
+                    if (!value.StartsWith("-"))
+                    {
+                        sopsConfig = value;
+                    }
+                }
+            }
+
             if (!string.IsNullOrWhiteSpace(ageKeyFile))
             {
                 env["SOPS_AGE_KEY_FILE"] = ageKeyFile;
+            }
+
+            if (!string.IsNullOrWhiteSpace(ageKey))
+            {
+                env["SOPS_AGE_KEY"] = ageKey;
             }
 
             if (env.Count > 0)
@@ -585,6 +798,11 @@ public class SopsCliAgeEnvExpander : ISecretVaultExpander
 
             args.Add("-d");
             args.Add(path);
+
+            foreach (var arg in args)
+            {
+                si.ArgumentList.Add(arg);
+            }
 
             var process = new System.Diagnostics.Process
             {
@@ -664,6 +882,7 @@ public class SopsCliAgeEnvExpander : ISecretVaultExpander
             var env = new Dictionary<string, string>();
             var query = expression.Uri.Query;
             var ageKeyFile = this.AgeKeyFile;
+            var ageKey = this.AgeKey;
             var sopsConfig = this.SopsConfigPath;
 
             if (!string.IsNullOrWhiteSpace(query))
@@ -675,6 +894,12 @@ public class SopsCliAgeEnvExpander : ISecretVaultExpander
                     ageKeyFile = value;
                 }
 
+                value = nv["age-key"];
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    ageKey = Environment.GetEnvironmentVariable(value);
+                }
+
                 value = nv["sops-config"];
                 if (!string.IsNullOrWhiteSpace(value))
                 {
@@ -682,9 +907,53 @@ public class SopsCliAgeEnvExpander : ISecretVaultExpander
                 }
             }
 
+            if (expression.Tokens.Contains("--age-key-file"))
+            {
+                var index = expression.Tokens.IndexOf("--age-key-file");
+                if (index >= 0 && index + 1 < expression.Tokens.Count)
+                {
+                    var value = expression.Tokens[index + 1];
+                    if (!value.StartsWith("-"))
+                    {
+                        ageKeyFile = value;
+                    }
+                }
+            }
+
+            if (expression.Tokens.Contains("--age-key"))
+            {
+                var index = expression.Tokens.IndexOf("--age-key");
+                if (index >= 0 && index + 1 < expression.Tokens.Count)
+                {
+                    var value = expression.Tokens[index + 1];
+                    if (!value.StartsWith("-"))
+                    {
+                        ageKey = Environment.GetEnvironmentVariable(value);
+                    }
+                }
+            }
+
+            if (expression.Tokens.Contains("--sops-config"))
+            {
+                var index = expression.Tokens.IndexOf("--sops-config");
+                if (index >= 0 && index + 1 < expression.Tokens.Count)
+                {
+                    var value = expression.Tokens[index + 1];
+                    if (!value.StartsWith("-"))
+                    {
+                        sopsConfig = value;
+                    }
+                }
+            }
+
             if (!string.IsNullOrWhiteSpace(ageKeyFile))
             {
                 env["SOPS_AGE_KEY_FILE"] = ageKeyFile;
+            }
+
+            if (!string.IsNullOrWhiteSpace(ageKey))
+            {
+                env["SOPS_AGE_KEY"] = ageKey;
             }
 
             if (env.Count > 0)

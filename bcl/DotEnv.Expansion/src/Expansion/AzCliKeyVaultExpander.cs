@@ -10,23 +10,31 @@ public class AzCliKeyVaultExpander : ISecretVaultExpander
 
     public bool Synchronous => true;
 
-    public string Protocol => "akv";
-
-    public int? MaxDegreeOfParallelism { get; set; }
+    public string Protocol { get; set; } = "akv";
 
     public string SecretsExpression { get; set; } = "secret";
-
-    public bool? ManagedIdentity { get; set; } = false;
-
-    public string? ClientId { get; set; } = null;
-
-    public string? TenantId { get; set; } = null;
-
-    public bool? UseDeviceCode { get; set; } = false;
 
     public string? ClientSecret { get; set; } = null;
 
     public string? KeyVaultName { get; set; } = null;
+
+    public bool IsDefault { get; set; } = false;
+
+    protected string? DefaultUri
+    {
+        get
+        {
+            if (!this.IsDefault)
+                return null;
+
+            if (string.IsNullOrWhiteSpace(this.KeyVaultName))
+            {
+                return null;
+            }
+
+            return $"{this.Protocol}://{this.KeyVaultName}";
+        }
+    }
 
     public bool CanHandle(IList<string> expressions)
     {
@@ -38,10 +46,15 @@ public class AzCliKeyVaultExpander : ISecretVaultExpander
 
         var url = expressions[1];
 
+        if (this.IsDefault && url.EqualsFold("default") && !string.IsNullOrWhiteSpace(this.KeyVaultName))
+        {
+            return true;
+        }
+
         if (!string.IsNullOrWhiteSpace(this.KeyVaultName))
         {
             return url.StartsWith($"{this.Protocol}://{this.KeyVaultName}", StringComparison.OrdinalIgnoreCase) ||
-                   url.StartsWith($"azure-key-vault://{this.KeyVaultName}", StringComparison.OrdinalIgnoreCase);
+                    url.StartsWith($"azure-key-vault://{this.KeyVaultName}", StringComparison.OrdinalIgnoreCase);
         }
 
         return url.StartsWith($"{this.Protocol}://", StringComparison.OrdinalIgnoreCase) ||
@@ -50,7 +63,7 @@ public class AzCliKeyVaultExpander : ISecretVaultExpander
 
     public ExpansionResult Expand(IList<string> args)
     {
-        var (result, error) = SecretExpression.Parse(args);
+        var (result, error) = SecretExpression.Parse(args, this.SecretsExpression, null, this.DefaultUri);
         if (error != null)
         {
             return new ExpansionResult
@@ -86,6 +99,7 @@ public class AzCliKeyVaultExpander : ISecretVaultExpander
 
         var version = string.Empty;
         var key = path;
+        key = Convert(key);
         if (path.Contains('/'))
         {
             var parts = path.Split('/');
@@ -233,7 +247,7 @@ public class AzCliKeyVaultExpander : ISecretVaultExpander
 
     public async Task<ExpansionResult> ExpandAsync(IList<string> args, CancellationToken cancellationToken = default)
     {
-        var (result, error) = SecretExpression.Parse(args);
+        var (result, error) = SecretExpression.Parse(args, this.SecretsExpression, null, this.DefaultUri);
         if (error != null)
         {
             return new ExpansionResult
@@ -278,6 +292,8 @@ public class AzCliKeyVaultExpander : ISecretVaultExpander
                 key = string.Join('/', parts.Skip(1));
             }
         }
+
+        key = Convert(key);
 
         var list = new List<string>()
         {
@@ -412,5 +428,30 @@ public class AzCliKeyVaultExpander : ISecretVaultExpander
             Error = new Exception($"Failed to expand secret '{string.Join(" ", args)}'. \n stdout:{text} \n stderr: {stderr}"),
             Position = -1,
         };
+    }
+
+    private static string Convert(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return string.Empty;
+
+        var builder = StringBuilderCache.Acquire();
+        foreach (var c in name)
+        {
+            if (char.IsLetterOrDigit(c))
+            {
+                builder.Append(c);
+            }
+            else if (c is '-' or '_' or '.' or '/' or ':' or '\\')
+            {
+                builder.Append('-');
+            }
+            else
+            {
+                continue;
+            }
+        }
+
+        return builder.ToString();
     }
 }
