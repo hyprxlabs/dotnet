@@ -44,8 +44,7 @@ SECRET3=$(secret akv://kv-hyprx-tmp/secret3 --create --size 32)
             Assert.Skip("Azure CLI (az) is not installed.");
         }
 
-        var az = new Command(azPath);
-
+        var az = new Command($"\"{azPath}\"");
         var o1 = az.Run(["account", "list-locations"]);
         if (o1.ExitCode != 0)
         {
