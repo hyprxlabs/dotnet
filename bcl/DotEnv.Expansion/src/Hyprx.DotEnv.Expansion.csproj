@@ -7,13 +7,15 @@
 
   <PropertyGroup>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageTags>Hyprx.DotEnv.Expansion</PackageTags>
+    <PackageTags>Hyprx DotEnv Expansion</PackageTags>
     <Description>
-        Hyprx.DotEnv.Expansion
+        Expand variables and perform command substitution in dotenv (.env) files.
     </Description>
     <PackageReleaseNotes Condition="Exists('$(MSBuildProjectDirectory)/CHANGELOG.md')">
       $([System.IO.File]::ReadAllText("$(MSBuildProjectDirectory)/CHANGELOG.md"))
     </PackageReleaseNotes>
+    <PackageLicenseFile Condition="Exists('$(LicensePath)')">LICENSE.md</PackageLicenseFile>
+    <PackageIcon>hyprx_logo_256.png</PackageIcon>
   </PropertyGroup>
 
   <ItemGroup>

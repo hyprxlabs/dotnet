@@ -17,7 +17,7 @@ is found in a subexpression.
 ## Summary Usage
 
 ```csharp
-// AddSopsCliAgeEnv enables pseudo secret command that tie to expanders that implement ISecretValueExpander, 
+// AddSopsEnvExpander enables pseudo secret command that tie to expanders that implement ISecretValueExpander, 
 // this one adds an expander than can handle sop, age, & env files.
 
 // WithCommandSubstitution() enables calling commands using $() syntax.  
@@ -107,7 +107,7 @@ Currently only bash and pwsh are supported.
 Currently two implementations of ISecretVaultExpander ship with this library:
 
 - **SopsEnvExpander** which can expand variables from sops/age encrypted dotenv file.
-- **AzCliKeyVaultExander** which can expand variables from the azure cli for azure keyvault.
+- **AzCliKeyVaultExpander** which can expand variables from the azure cli for azure keyvault.
 
 The benefits of using implement ISecretVaultExpanders is that enable creating
 secrets that do not exist and provide a uniform experience to pull a secret by primarily
@@ -149,8 +149,8 @@ SECRET_TWO=$(secret sops-env:///$PWD/../relative/.env --name VAR_NAME)
 SECRET_THREE=$(secret sops-env:///absolute/path/to/.env --name MISSING_SECRET --create --size 20)
 ```
 
-The use of the $PWD or $CWD variable is required for relative paths as URIs still need a root path
-to resolve the relative path.
+The use of the $PWD or $CWD variable is required for relative paths as
+URIs still need a root path to resolve the relative path.
 
 The expander takes additional arguments:
 
@@ -176,6 +176,15 @@ Inside of a .env file it would look like
 SECRET_ONE=$(secret akv://vault-name --name var-name)
 SECRET_TWO=$(secret akv://vault-name --name missing-secret --create --size 20)
 ```
+
+The expander takes additional arguments:
+
+- `--auto-login` Automatically log into the Azure CLI if not already logged in.
+- `--identity` Use a managed identity to authenticate.
+- `--client-id` The client id of the service principal or managed identity to use.
+- `--tenant-id` The tenant id of the service principal or managed identity to use.
+- `--password` The environment variable that holds the password for the service principal or managed identity.
+- `--certificate` The path to the certificate file for the service principal.
 
 ## Notes
 

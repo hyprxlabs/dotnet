@@ -14,11 +14,21 @@ public class AzCliKeyVaultExpander : ISecretVaultExpander
 
     public string SecretsExpression { get; set; } = "secret";
 
-    public string? ClientSecret { get; set; } = null;
-
     public string? KeyVaultName { get; set; } = null;
 
     public bool IsDefault { get; set; } = false;
+
+    public bool AutoLogin { get; set; } = false;
+
+    public bool ManagedIdentity { get; set; } = false;
+
+    public string? TenantId { get; set; } = null;
+
+    public string? ClientId { get; set; } = null;
+
+    public string? Certificate { get; set; } = null;
+
+    public string? Secret { get; set; } = null;
 
     protected string? DefaultUri
     {
@@ -63,6 +73,7 @@ public class AzCliKeyVaultExpander : ISecretVaultExpander
 
     public ExpansionResult Expand(IList<string> args)
     {
+        List<string> originalArgs = [.. args];
         var (result, error) = SecretExpression.Parse(args, this.SecretsExpression, null, this.DefaultUri);
         if (error != null)
         {
@@ -157,6 +168,153 @@ public class AzCliKeyVaultExpander : ISecretVaultExpander
             };
         }
 
+        var autoLogin = this.AutoLogin;
+        if (!autoLogin && result.Tokens.IndexOf("--auto-login") >= -1)
+        {
+            autoLogin = true;
+        }
+
+        if (autoLogin &&
+            (text.Contains("Please run 'az login' to setup account") ||
+            stderr.Contains("Please run 'az login' to setup account")))
+        {
+            var clientId = this.ClientId ?? Environment.GetEnvironmentVariable("AZURE_CLIENT_ID");
+            var tenantId = this.TenantId ?? Environment.GetEnvironmentVariable("AZURE_TENANT_ID");
+            var clientCertificate = this.Certificate ?? Environment.GetEnvironmentVariable("AZURE_CLIENT_CERTIFICATE");
+            var password = this.Secret ?? Environment.GetEnvironmentVariable("AZURE_CLIENT_SECRET");
+            var identity = this.ManagedIdentity || Environment.GetEnvironmentVariable("AZURE_MANAGED_IDENTITY")?.EqualsFold("true") == true;
+
+            if (!identity && result.Tokens.IndexOf("--identity") >= 0)
+            {
+                identity = true;
+            }
+
+            var index = result.Tokens.IndexOf("--client-id");
+            if (index >= -1 && index + 1 < result.Tokens.Count)
+            {
+                var value = result.Tokens[index + 1];
+                if (value[0] is not '-' and not '/')
+                {
+                    clientId = value;
+                }
+            }
+
+            index = result.Tokens.IndexOf("--tenant");
+            if (index >= -1 && index + 1 < result.Tokens.Count)
+            {
+                var value = result.Tokens[index + 1];
+                if (value[0] is not '-' and not '/')
+                {
+                    tenantId = value;
+                }
+            }
+
+            index = result.Tokens.IndexOf("--password");
+            if (index >= -1 && index + 1 < result.Tokens.Count)
+            {
+                var value = result.Tokens[index + 1];
+                if (value[0] is not '-' and not '/')
+                {
+                    password = Environment.GetEnvironmentVariable(value);
+                }
+            }
+
+            index = result.Tokens.IndexOf("--certificate");
+            if (index >= -1 && index + 1 < result.Tokens.Count)
+            {
+                var value = result.Tokens[index + 1];
+                if (value[0] is not '-' and not '/')
+                {
+                    clientCertificate = Environment.GetEnvironmentVariable(value);
+                }
+            }
+
+            var loginArgs = new List<string> { "login" };
+            if (identity)
+            {
+                loginArgs.Add("--identity");
+                if (!string.IsNullOrWhiteSpace(this.ClientId))
+                {
+                    loginArgs.Add("--client-id");
+                    loginArgs.Add(this.ClientId);
+                }
+            }
+            else
+            {
+                if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(tenantId))
+                {
+                    return new ExpansionResult
+                    {
+                        Error = new InvalidOperationException("Client ID and Tenant ID must be provided for non-managed identity login."),
+                        Position = -1,
+                    };
+                }
+
+                if (string.IsNullOrWhiteSpace(password) && string.IsNullOrWhiteSpace(clientCertificate))
+                {
+                    return new ExpansionResult
+                    {
+                        Error = new InvalidOperationException("Either Client Secret or Client Certificate must be provided for non-managed identity login."),
+                        Position = -1,
+                    };
+                }
+
+                loginArgs.Add("--service-principal");
+                loginArgs.Add("--tenant");
+                loginArgs.Add(tenantId);
+                loginArgs.Add("--username");
+                loginArgs.Add(clientId);
+
+                if (!string.IsNullOrWhiteSpace(clientCertificate))
+                {
+                    loginArgs.Add("--certificate");
+                    loginArgs.Add(clientCertificate);
+                }
+
+                if (!string.IsNullOrWhiteSpace(password))
+                {
+                    loginArgs.Add("--password");
+                    loginArgs.Add(password);
+                }
+            }
+
+            var siLogin = new ProcessStartInfo()
+            {
+                FileName = "az",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+
+            foreach (var arg in loginArgs)
+            {
+                siLogin.ArgumentList.Add(arg);
+            }
+
+            var processLogin = new Process()
+            {
+                StartInfo = siLogin,
+            };
+
+            processLogin.Start();
+            processLogin.WaitForExit();
+            var stdoutLogin = processLogin.StandardOutput.ReadToEnd();
+            var stderrLogin = processLogin.StandardError.ReadToEnd();
+
+            if (processLogin.ExitCode != 0)
+            {
+                return new ExpansionResult
+                {
+                    Error = new Exception($"Failed to log in to Azure CLI. \n stdout: {stdoutLogin} \n stderr: {stderrLogin}"),
+                    Position = -1,
+                };
+            }
+
+            // Retry the original command after successful login
+            return this.Expand(originalArgs);
+        }
+
         if (text.Contains("NotFound") || stderr.Contains("NotFound"))
         {
             if (result.Create)
@@ -183,14 +341,14 @@ public class AzCliKeyVaultExpander : ISecretVaultExpander
                 var secretValue = sg.GenerateAsString(result.Size);
 
                 var args0 = new List<string>()
-                            {
-                                "keyvault",
-                                "secret",
-                                "set",
-                                "--name", key,
-                                "--value", secretValue,
-                                "--vault-name", domain,
-                            };
+                    {
+                        "keyvault",
+                        "secret",
+                        "set",
+                        "--name", key,
+                        "--value", secretValue,
+                        "--vault-name", domain,
+                    };
 
                 if (result.ExpiresAt.HasValue)
                 {
@@ -247,6 +405,7 @@ public class AzCliKeyVaultExpander : ISecretVaultExpander
 
     public async Task<ExpansionResult> ExpandAsync(IList<string> args, CancellationToken cancellationToken = default)
     {
+        List<string> originalArgs = [.. args];
         var (result, error) = SecretExpression.Parse(args, this.SecretsExpression, null, this.DefaultUri);
         if (error != null)
         {
@@ -340,6 +499,153 @@ public class AzCliKeyVaultExpander : ISecretVaultExpander
                 Value = text,
                 Position = -1,
             };
+        }
+
+        var autoLogin = this.AutoLogin;
+        if (!autoLogin && result.Tokens.IndexOf("--auto-login") >= -1)
+        {
+            autoLogin = true;
+        }
+
+        if (autoLogin &&
+            (text.Contains("Please run 'az login' to setup account") ||
+            stderr.Contains("Please run 'az login' to setup account")))
+        {
+            var clientId = this.ClientId ?? Environment.GetEnvironmentVariable("AZURE_CLIENT_ID");
+            var tenantId = this.TenantId ?? Environment.GetEnvironmentVariable("AZURE_TENANT_ID");
+            var clientCertificate = this.Certificate ?? Environment.GetEnvironmentVariable("AZURE_CLIENT_CERTIFICATE");
+            var password = this.Secret ?? Environment.GetEnvironmentVariable("AZURE_CLIENT_SECRET");
+            var identity = this.ManagedIdentity || Environment.GetEnvironmentVariable("AZURE_MANAGED_IDENTITY")?.EqualsFold("true") == true;
+
+            if (!identity && result.Tokens.IndexOf("--identity") >= 0)
+            {
+                identity = true;
+            }
+
+            var index = result.Tokens.IndexOf("--client-id");
+            if (index >= 0 && index + 1 < result.Tokens.Count)
+            {
+                var value = result.Tokens[index + 1];
+                if (value[0] is not '-' and not '/')
+                {
+                    clientId = value;
+                }
+            }
+
+            index = result.Tokens.IndexOf("--tenant-id");
+            if (index >= 0 && index + 1 < result.Tokens.Count)
+            {
+                var value = result.Tokens[index + 1];
+                if (value[0] is not '-' and not '/')
+                {
+                    tenantId = value;
+                }
+            }
+
+            index = result.Tokens.IndexOf("--password");
+            if (index >= 0 && index + 1 < result.Tokens.Count)
+            {
+                var value = result.Tokens[index + 1];
+                if (value[0] is not '-' and not '/')
+                {
+                    password = Environment.GetEnvironmentVariable(value);
+                }
+            }
+
+            index = result.Tokens.IndexOf("--certificate");
+            if (index >= 0 && index + 1 < result.Tokens.Count)
+            {
+                var value = result.Tokens[index + 1];
+                if (value[0] is not '-' and not '/')
+                {
+                    clientCertificate = Environment.GetEnvironmentVariable(value);
+                }
+            }
+
+            var loginArgs = new List<string> { "login" };
+            if (identity)
+            {
+                loginArgs.Add("--identity");
+                if (!string.IsNullOrWhiteSpace(this.ClientId))
+                {
+                    loginArgs.Add("--client-id");
+                    loginArgs.Add(this.ClientId);
+                }
+            }
+            else
+            {
+                if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(tenantId))
+                {
+                    return new ExpansionResult
+                    {
+                        Error = new InvalidOperationException("Client ID and Tenant ID must be provided for non-managed identity login."),
+                        Position = -1,
+                    };
+                }
+
+                if (string.IsNullOrWhiteSpace(password) && string.IsNullOrWhiteSpace(clientCertificate))
+                {
+                    return new ExpansionResult
+                    {
+                        Error = new InvalidOperationException("Either Client Secret or Client Certificate must be provided for non-managed identity login."),
+                        Position = -1,
+                    };
+                }
+
+                loginArgs.Add("--service-principal");
+                loginArgs.Add("--tenant");
+                loginArgs.Add(tenantId);
+                loginArgs.Add("--username");
+                loginArgs.Add(clientId);
+
+                if (!string.IsNullOrWhiteSpace(clientCertificate))
+                {
+                    loginArgs.Add("--certificate");
+                    loginArgs.Add(clientCertificate);
+                }
+
+                if (!string.IsNullOrWhiteSpace(password))
+                {
+                    loginArgs.Add("--password");
+                    loginArgs.Add(password);
+                }
+            }
+
+            var siLogin = new ProcessStartInfo()
+            {
+                FileName = "az",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+
+            foreach (var arg in loginArgs)
+            {
+                siLogin.ArgumentList.Add(arg);
+            }
+
+            var processLogin = new Process()
+            {
+                StartInfo = siLogin,
+            };
+
+            processLogin.Start();
+            await processLogin.WaitForExitAsync();
+            var stdoutLogin = await processLogin.StandardOutput.ReadToEndAsync();
+            var stderrLogin = await processLogin.StandardError.ReadToEndAsync();
+
+            if (processLogin.ExitCode != 0)
+            {
+                return new ExpansionResult
+                {
+                    Error = new Exception($"Failed to log in to Azure CLI. \n stdout: {stdoutLogin} \n stderr: {stderrLogin}"),
+                    Position = -1,
+                };
+            }
+
+            // Retry the original command after successful login
+            return await this.ExpandAsync(originalArgs, cancellationToken);
         }
 
         if (text.Contains("NotFound") || stderr.Contains("NotFound"))

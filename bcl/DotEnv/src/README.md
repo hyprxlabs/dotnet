@@ -2,24 +2,46 @@
 
 ## Overview
 
-An implementation of dotenv for parsing and writing .env files.
+Parse, read, and write dotenv (.env) files.
 
 This library can:
 
-- perserve the order of the environment variables defined in the file.
-- can parse and write comments.
-- can load multiple files.
-- can handle extra parsing features such as json, yaml, and bacticks.  
-- avoids reflection to help with AOT scenarios.
+- Perserve the order of the environment variables defined in the file.
+- Parse and write comments.
+- Load multiple files.
+- Enables other multiline delimiters using {}, ---, or \`.
+- Avoids reflection to help with AOT scenarios.
 
-For variable and command subsitution use the "Hyprx.DotEnv.Expansion" library
-which can perform variable expansion and command subusitution.
+For variable expansion and command substitution use the
+"Hyprx.DotEnv.Expansion" library.
+
+The Serializer converts to and from a new type called `DotEnvDocument` and
+`OrderedDictionary<string,string>`.
 
 ## Usage
 
 ```csharp
 using Hyprx.DotEnv;
 
+
+// load directly to environment variables
+DotEnvLoader.Load(new DotEnvLoadOptions() {
+    Files = ["./path/.env", "./path/prod.env"]
+});
+
+// parse multiple files and then load.
+var doc3 = DotEnvLoader.Parse(new DotEnvLoadOptions() {
+    Files = ["./path/.env", "./path/prod.env"]
+});
+
+// do something with values.
+doc3["SOME_VAR"] = "test";
+
+// then load to environment variables and 
+// overwrite the existing ones.
+DotEnvLoader.Load(doc3, true);
+
+// use the serializer directly.
 var doc = DotEnvSerializer.DeserializeDocument(
 """
 # COMMENT
@@ -48,6 +70,8 @@ foreach(var node in doc)
 var content = DotEnvSerializer.SerializeDocument(doc);
 Console.WriteLine(content);
 
+// use the DotEnvDocument to create a new file.
+
 // 
 // # NODE VARS
 // NODE_ENV=production
@@ -60,12 +84,12 @@ doc2["OTHER_VAR"] = "test";
 
 var content2 = DotEnvSerializer.SerializeDocument(doc);
 Console.WriteLine(content2);
-
+File.WriteAllText(".env", content2);
 ```
 
 ## Escaping
 
-Escaping only works when using double quotes.
+Escaping only works when using double quotes or backticks (\`).
 
 - `\b` backspace
 - `\n` newline
@@ -73,9 +97,9 @@ Escaping only works when using double quotes.
 - `\f` form feed
 - `\v` vertical tab
 - `\t` tab
-- '\"` escape double quote
-- '\'` escape single quote
-- '\uFFFF` escape unicode characters.
+- `\"` escape double quote
+- `\\'` escape single quote
+- `\uFFFF` escape unicode characters.
 
 ## Defaults
 
@@ -116,8 +140,10 @@ NEXT_SECRET="test"
 
 ### AllowBackticks
 
-The `AllowBackticks` options will allow using `\`` to noate the start and end
-of a multiline value without using quotes.
+The `AllowBackticks` options will allow using `\`` to notate the start and end
+of a multiline value without using quotes so that single quotes and doubles
+may be used without the need to escape them.  Backticks functions similarly
+to using double quotes.
 
 ```dotenv
 MYVALUE=`this

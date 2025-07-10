@@ -2,6 +2,7 @@ using System.Runtime.Intrinsics.X86;
 using System.Threading.Tasks;
 
 using Hyprx.Exec;
+using Hyprx.Extras;
 
 namespace Hyprx.DotEnv.Expansion.Tests;
 
@@ -31,7 +32,7 @@ public static class AzCliKeyVaultExpanderTests
     }
 
     [Fact]
-    public static void Verify_AzCli_KeyVault_Expansion()
+    public static void Verify_AzKeyVault_Expansion()
     {
         var content =
 """
@@ -85,5 +86,52 @@ SECRET3=$(secret akv://kv-hyprx-tmp/secret3 --create --size 32)
         var value = env["SECRET3"];
         Console.WriteLine($"SECRET3: {value}");
         Assert.NotEqual("$(secret akv:///kv-hyprx-tmp/secret3 --create --size 32)", value);
+    }
+
+    // TODO: setup credentials in pipeline.
+    [Fact(Skip = "Uses service principal")]
+    public static void Verify_AzKeyVault_AutoLogin()
+    {
+        var hasSecret = !Environment.GetEnvironmentVariable("MY_PASS").IsNullOrWhiteSpace();
+        var clientId = Environment.GetEnvironmentVariable("AZURE_CLIENT_ID") ?? string.Empty;
+        var tenantId = Environment.GetEnvironmentVariable("AZURE_TENANT_ID") ?? string.Empty;
+        var pass = Environment.GetEnvironmentVariable("MY_PASS");
+        if (string.IsNullOrWhiteSpace(pass))
+        {
+            pass = string.Empty;
+            Environment.SetEnvironmentVariable("MY_PASS", pass);
+        }
+
+        var content =
+$$"""
+SECRET3=$(secret akv://kv-hyprx-tmp --name secret1 --create --size 32 --auto-login --tenant {{tenantId}} --client-id '{{clientId}}' --password MY_PASS)
+""";
+
+        var azPath = PathFinder.Which("az");
+        if (string.IsNullOrWhiteSpace(azPath))
+        {
+            Assert.Skip("Azure CLI (az) is not installed.");
+        }
+
+        var az = new Command($"\"{azPath}\"");
+
+        var expander = new ExpansionBuilder()
+            .AddAzCliKeyVaultExpander()
+            .Build();
+
+        var env = DotEnvSerializer.DeserializeDocument(content);
+        var summary = expander.Expand(env);
+
+        if (summary.IsError)
+        {
+            foreach (var error in summary.Errors)
+            {
+                Assert.Fail($"Error: {error}  {error.Exception}");
+            }
+        }
+
+        var value = env["SECRET3"];
+        Console.WriteLine($"SECRET3: {value}");
+        Assert.Equal("I am GROOT", value);
     }
 }

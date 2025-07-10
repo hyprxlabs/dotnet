@@ -3,6 +3,9 @@ using Hyprx.DotEnv.Serialization;
 
 namespace Hyprx.DotEnv;
 
+/// <summary>
+/// A class for loading and parsing .env files and content.
+/// </summary>
 public static class DotEnvLoader
 {
     public static DotEnvDocument Parse(DotEnvLoadOptions options)
@@ -61,6 +64,33 @@ public static class DotEnvLoader
                 {
                     Environment.SetEnvironmentVariable(var.Name, var.Value);
                 }
+            }
+        }
+    }
+
+    public static void Load(DotEnvDocument document, bool overrideEnvironment = false)
+    {
+        foreach (var entry in document)
+        {
+            if (entry is DotEnvEntry var)
+            {
+                var hasValue = Environment.GetEnvironmentVariable(var.Name) is not null;
+                if (overrideEnvironment || !hasValue)
+                {
+                    Environment.SetEnvironmentVariable(var.Name, var.Value);
+                }
+            }
+        }
+    }
+
+    public static void Load(IEnumerable<KeyValuePair<string, string>> dictionary, bool overrideEnvironment = false)
+    {
+        foreach (var pair in dictionary)
+        {
+            var hasValue = Environment.GetEnvironmentVariable(pair.Key) is not null;
+            if (overrideEnvironment || !hasValue)
+            {
+                Environment.SetEnvironmentVariable(pair.Key, pair.Value);
             }
         }
     }

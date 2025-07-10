@@ -152,6 +152,7 @@ public class DotEnvExpander
         var tmpPrefix = o.SecretsExpression.AsSpan().Trim();
         var secretPrefix = new char[tmpPrefix.Length + 1];
         tmpPrefix.CopyTo(secretPrefix);
+        secretPrefix[tmpPrefix.Length] = ' '; // expression must end with a space.
 
         var tokenBuilder = StringBuilderCache.Acquire();
         var output = StringBuilderCache.Acquire();
@@ -244,6 +245,9 @@ public class DotEnvExpander
 
                         if (match && k < template.Length)
                         {
+                            i++;
+                            remaining--;
+
                             // we have a match, so we can treat this as a secret substitution.
                             lastTokenStartIndex = i;
                             kind = TokenKind.Expression;
@@ -717,7 +721,7 @@ public class DotEnvExpander
         var temp = o.SecretsExpression.AsSpan().Trim();
         Span<char> secretPrefix = stackalloc char[temp.Length + 1];
         temp.CopyTo(secretPrefix);
-        secretPrefix[temp.Length - 1] = ' '; // expression must end with a space.
+        secretPrefix[temp.Length] = ' '; // expression must end with a space.
 
         var tokenBuilder = StringBuilderCache.Acquire();
         var output = StringBuilderCache.Acquire();
@@ -810,6 +814,9 @@ public class DotEnvExpander
 
                         if (match && k < template.Length)
                         {
+                            i++;
+                            remaining--;
+
                             // we have a match, so we can treat this as a secret substitution.
                             lastTokenStartIndex = i;
                             kind = TokenKind.Expression;

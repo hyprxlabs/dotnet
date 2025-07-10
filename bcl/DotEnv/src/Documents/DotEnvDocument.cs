@@ -269,9 +269,9 @@ public class DotEnvDocument : IEnumerable<DotEnvNode>,
         return dictionary;
     }
 
-    public OrderedDictionary ToOrderedDictionary()
+    public OrderedDictionary<string, string> ToOrderedDictionary()
     {
-        var dictionary = new OrderedDictionary();
+        var dictionary = new OrderedDictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var entry in this.entries)
         {
             if (entry is DotEnvEntry nameValuePair)

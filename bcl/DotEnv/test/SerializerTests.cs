@@ -9,14 +9,12 @@ public static class SerializerTests
     [Fact]
     public static void Verify_Simple()
     {
-        var values = DotEnvSerializer.DeserializeDictionary(
+        var env = DotEnvSerializer.DeserializeDictionary(
             """
 TEST="Hello World"
 """);
-        Assert.NotNull(values);
-        Assert.IsType<Dictionary<string, string>>(values);
-
-        var env = (Dictionary<string, string>)values;
+        Assert.NotNull(env);
+        Assert.IsType<Dictionary<string, string>>(env);
         Assert.Equal("Hello World", env["TEST"]);
     }
 

@@ -39,22 +39,22 @@ public static class DotEnvSerializer
     public static void SerializeDictionary(IEnumerable<KeyValuePair<string, string>> dictionary, TextWriter writer, DotEnvSerializerOptions? options = null)
         => Serializer.SerializeDictionary(dictionary, writer, options);
 
-    public static Dictionary<string, string> DeserializeDictionary(string value, DotEnvSerializerOptions? options = null)
+    public static OrderedDictionary<string, string> DeserializeDictionary(string value, DotEnvSerializerOptions? options = null)
     {
         using var sr = new StringReader(value);
         return DeserializeDictionary(sr, options);
     }
 
-    public static Dictionary<string, string> DeserializeDictionary(Stream stream, DotEnvSerializerOptions? options = null)
+    public static OrderedDictionary<string, string> DeserializeDictionary(Stream stream, DotEnvSerializerOptions? options = null)
     {
         using var sr = new StreamReader(stream, Encoding.UTF8);
         return DeserializeDictionary(sr, options);
     }
 
-    public static Dictionary<string, string> DeserializeDictionary(TextReader writer, DotEnvSerializerOptions? options = null)
+    public static OrderedDictionary<string, string> DeserializeDictionary(TextReader writer, DotEnvSerializerOptions? options = null)
     {
         var doc = Serializer.DeserializeDocument(writer, options);
-        return doc.ToDictionary();
+        return doc.ToOrderedDictionary();
     }
 
     public static DotEnvDocument DeserializeDocument(string value, DotEnvSerializerOptions? options = null)

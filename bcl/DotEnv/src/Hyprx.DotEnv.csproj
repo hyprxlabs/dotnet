@@ -7,9 +7,9 @@
 
   <PropertyGroup>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageTags>Hyprx DotEnv VariableExpansion Expansion Env</PackageTags>
+    <PackageTags>Hyprx DotEnv Env</PackageTags>
     <Description>
-        An implementation of dotenv for parsing and writing .env files.
+        Parse, read, and write dotenv (.env) files.
     </Description>
     <PackageReleaseNotes Condition="Exists('$(MSBuildProjectDirectory)/CHANGELOG.md')">
       $([System.IO.File]::ReadAllText("$(MSBuildProjectDirectory)/CHANGELOG.md"))

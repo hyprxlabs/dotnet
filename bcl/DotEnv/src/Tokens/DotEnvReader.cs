@@ -261,7 +261,7 @@ public class DotEnvReader
                             continue;
                         }
 
-                        if (this.capture is Capture.DoubleQuote)
+                        if (this.capture is Capture.DoubleQuote or Capture.Backtick)
                         {
                             if (c is '\\')
                             {
