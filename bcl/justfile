@@ -64,3 +64,20 @@ remove name:
     dotnet sln . remove "./{{ name }}/src" "./{{ name }}/test"
     rm -rf "./{{ name }}"
     echo "Removed ./{{ name }}"
+
+release:
+    #!{{ bash }}
+    echo "Running release command"
+    dotnet build . -c Release --no-restore
+
+dry-publish:
+    #!{{ bash }}
+    echo "Running dry-publish command"
+    dotnet pack -c Release --include-symbols --include-source --no-build -o ./.artifacts/packs
+    echo "Packages would be pushed to NuGet, but this is a dry run."
+
+publish:
+    #!{{ bash }}
+    echo "Running publish command"
+    dotnet pack -c Release --include-symbols --include-source --no-build -o ./.artifacts/packs
+    dotnet nuget push ./.artifacts/packs/Hyprx.*.nupkg -k $HYPRX_NUGET_KEY -s https://api.nuget.org/v3/index.json --skip-duplicate
