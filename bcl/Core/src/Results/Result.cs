@@ -16,6 +16,32 @@ public class Result : IEmptyResult<Exception>
         this.IsOk = false;
     }
 
+    public static implicit operator Result<Never>(Result result)
+    {
+        if (result.IsError)
+            return new Result<Never>(result.Error);
+
+        return new Result<Never>(Never.Value);
+    }
+
+    public static implicit operator Result(Result<Never> result)
+    {
+        if (result.IsError)
+            return new Result(result.Error);
+
+        return Result.Ok();
+    }
+
+    public static implicit operator Task<Result>(Result result)
+    {
+        return Task.FromResult(result);
+    }
+
+    public static implicit operator ValueTask<Result>(Result result)
+    {
+        return new ValueTask<Result>(result);
+    }
+
     public static Result Ok()
     {
         return new Result();
