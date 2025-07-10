@@ -46,7 +46,9 @@ a make-like experience in .NET within console projects or using `dotnet run app.
   <ItemGroup Condition="'$(ReferenceBcl)' != 'true'">
     <PackageReference Include="Hyprx.Lodi" />
     <PackageReference Include="Hyprx.DotEnv" />
+    <PackageReference Include="Hyprx.DotEnv.Expansion" />
     <PackageReference Include="Hyprx.Secrets" />
+    <PackageReference Include="Hyprx.Exec" />
     <PackageReference Include="Hyprx.Ansi" />
   </ItemGroup>
 </Project>

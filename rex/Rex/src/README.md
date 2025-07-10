@@ -8,18 +8,18 @@ The cli tool has help support with --help flag.
 
 ## Rexfile
 
-The rex cli will look in the current working directory and look for a file called
+The dotnet-rex cli will look in the current working directory and look for a file called
 "rexfile" with no extension. This file is a configuration file for telling rex
 where to look for the file or csproj that contains tasks.
 
-The rexfile setting within the file will tell rex where to find either the
+The rexfile setting within the file will tell dotnet-rex where to find either the
 csproj file, the single csharp file, or the assembly to run.
 
-If the file is not found, rex will look for a rexfile.cs in the current folder
-or look for a subfolder called .rex and then load a file called ./.rex/main.cs
-or the first csproj it finds in the .rex folder: ./.rex/*.csproj.
+If the file is not found, dotnet-rex will look for a rexfile.cs in the current folder
+or look for a subfolder called .dotnet-rex and then load a file called ./.rex/main.cs
+or the first csproj it finds in the .dotnet-rex folder: ./.rex/*.csproj.
 
-Using the rex file is the most explicit.
+Using the dotnet-rex file is the most explicit.
 
 ### Using a project
 
@@ -46,58 +46,58 @@ rexfile:./path/to/app.dll
 ## List tasks/jobs
 
 ```bash
-rex list
+dotnet-rex list
 ```
 
 list namespaces will show all namespaces that are defined.
 
 ```bash
-rex list namespaces
+dotnet-rex list namespaces
 ```
 
 list services will shall all namespaces that are defined as a service.
 
 ```bash
-rex list services
+dotnet-rex list services
 ```
 
 ## Run a task
 
 ```bash
 # runs a job or task called hello
-rex hello
+dotnet-rex hello
 ```
 
 ```bash
 # runs a job or task called hello
-rex run hello
+dotnet-rex target hello
 ```
 
 This is the most explicit.
 
 ```bash
 # runs only a task called hello.
-rex tasks run hello
+dotnet-rex tasks run hello
 ```
 
 ## Run many tasks
 
 ```bash
-rex run many "target1"  "target2"
+dotnet-rex target many "target1"  "target2"
 ```
 
 ```bash
-rex tasks "task1" "task2"
+dotnet-rex tasks "task1" "task2"
 ```
 
 This is the most explicit.
 
 ```bash
-rex tasks run many "task1" "task2"
+dotnet-rex tasks run many "task1" "task2"
 ```
 
 Note, if the task has the same name as a job or deployment, you'll need use
-the tasks subcommand so that rex knows which one to use.
+the tasks subcommand so that dotnet-rex knows which one to use.
 
 ## Run a job
 
@@ -105,32 +105,32 @@ Runs a single job and any dependencies.
 
 ```bash
 # runs a job or task alled job1
-rex job1
+dotnet-rex job1
 ```
 
 ```bash
 # runs a job or task alled job1
-rex run job1
+dotnet-rex target job1
 ```
 
 ```bash
-rex jobs run job1
+dotnet-rex jobs run job1
 ```
 
 ## Run many jobs
 
 ```bash
-rex run many "job1" "job2"
+dotnet-rex target many "job1" "job2"
 ```
 
 ```bash
-rex jobs "job1" "job2"
+dotnet-rex jobs "job1" "job2"
 ```
 
 this is the most explicit
 
 ```bash
-rex jobs run many "job1" "job2"
+dotnet-rex jobs run many "job1" "job2"
 ```
 
 ## Alias Commands
@@ -146,7 +146,7 @@ rex jobs run many "job1" "job2"
 - rollback
 
 These are shortcuts to running a job or task with the same name. A command like
-rex build is a shortcut to calling `rex run build`.  If a job is found the job
+dotnet-rex build is a shortcut to calling `dotnet-rex run build`.  If a job is found the job
 will be used and if a job doesn't an exist, but a task does, then the task called
 build will be used.
 
@@ -158,24 +158,24 @@ binds the target to a namespace.
 So if you define a task called mysql:up you can run
 
 ```bash
-rex up mysql
+dotnet-rex up mysql
 ```
 
 or you can run
 
 ```bash
-rex mysql:up
+dotnet-rex mysql:up
 ```
 
 so if you want to pass an argument in and not have it picked up as a service argument, you must
 be explicit or prefix a task with colon (:).
 
 ```bash
-rex mysql:up arg1
+dotnet-rex mysql:up arg1
 ```
 
 ```bash
-rex :up arg1
+dotnet-rex :up arg1
 ```
 
 ## Options
@@ -234,7 +234,7 @@ Job("job1", (job) =>
 //
 // when true is set, the namespace is created like a service or project.
 // so you can call
-// `rex up mssql`  or  `rex run mssql:up`
+// `dotnet-rex up mssql`  or  `dotnet-rex run mssql:up`
 //
 // the concept of service is to make it easier to target a specific project
 // service, or subfolder.

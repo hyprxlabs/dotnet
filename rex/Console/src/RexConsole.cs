@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 
 using Hyprx.Collections.Generic;
 using Hyprx.DotEnv.Documents;
+using Hyprx.DotEnv.Expansion;
 using Hyprx.Extras;
 using Hyprx.Lodi;
 using Hyprx.Results;
@@ -290,9 +291,15 @@ public static class RexConsole
             var doc = DotEnv.DotEnvLoader.Parse(new DotEnv.DotEnvLoadOptions()
             {
                 Files = options.EnvFiles,
-                Expand = true,
                 OverrideEnvironment = true,
             });
+
+            var expander = new ExpansionBuilder()
+                .WithCommandSubstitution()
+                .Build();
+
+            var summary = expander.Expand(doc);
+            doc = summary.Value;
 
             foreach (var node in doc)
             {
@@ -309,9 +316,17 @@ public static class RexConsole
             var doc = DotEnv.DotEnvLoader.Parse(new DotEnv.DotEnvLoadOptions()
             {
                 Files = options.SecretFiles,
-                Expand = true,
                 OverrideEnvironment = false,
             });
+
+            var expander = new ExpansionBuilder()
+                .WithCommandSubstitution()
+                .AddAzCliKeyVaultExpander()
+                .AddSopsEnvExpander()
+                .Build();
+
+            var summary = expander.Expand(doc);
+            doc = summary.Value;
 
             foreach (var node in doc)
             {

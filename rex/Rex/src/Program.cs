@@ -3,6 +3,16 @@
 using System.CommandLine;
 using System.CommandLine.Invocation;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
+
+using Hyprx.DotEnv;
+
+using Hyprx.DotEnv.Documents;
+using Hyprx.DotEnv.Expansion;
+
+using Hyprx.Exec;
+
+using Hyprx.Rex;
 
 using Hyprx.Rex.Commands;
 
@@ -193,7 +203,7 @@ jobsCommand.SetAction(Handlers.GenerateTargetsAction(() =>
 }));
 
 // rex run many "build" "clean" "test"
-var runManyCommand = new SubCommand("many", "Run multiple targets. If the first target is a job, it will run all jobs. If the first target is a task, it will run all tasks.")
+var targetManyCommand = new SubCommand("many", "Run multiple targets. If the first target is a job, it will run all jobs. If the first target is a task, it will run all tasks.")
 {
     Options.Context,
     Options.File,
@@ -205,8 +215,8 @@ var runManyCommand = new SubCommand("many", "Run multiple targets. If the first 
     Options.Targets,
 };
 
-runManyCommand.TreatUnmatchedTokensAsErrors = false;
-runManyCommand.SetAction(Handlers.GenerateTargetsAction(() =>
+targetManyCommand.TreatUnmatchedTokensAsErrors = false;
+targetManyCommand.SetAction(Handlers.GenerateTargetsAction(() =>
 {
     return new Hyprx.Exec.CommandArgs
      {
@@ -215,7 +225,7 @@ runManyCommand.SetAction(Handlers.GenerateTargetsAction(() =>
      };
 }));
 
-var runCommand = new SubCommand("run", "Run a target, task or job.")
+var targetCommand = new SubCommand("run", "Run a target, task or job.")
 {
     Options.Context,
     Options.File,
@@ -226,11 +236,11 @@ var runCommand = new SubCommand("run", "Run a target, task or job.")
     Options.Verbose,
     Options.Target,
     Options.Service,
-    runManyCommand,
+    targetManyCommand,
 };
 
-runCommand.TreatUnmatchedTokensAsErrors = false;
-runCommand.SetAction(Handlers.GenerateTargetAction(() =>
+targetCommand.TreatUnmatchedTokensAsErrors = false;
+targetCommand.SetAction(Handlers.GenerateTargetAction(() =>
 {
     return new Hyprx.Exec.CommandArgs
      {
@@ -319,6 +329,8 @@ var upCommand = new SubCommand("up", "Deploys or spins up infrastructure. This i
     Options.SecretFiles,
     Options.Verbose,
 };
+
+upCommand.Aliases.Add("deploy");
 upCommand.TreatUnmatchedTokensAsErrors = false;
 upCommand.SetAction(Handlers.GenerateAutoAction("up"));
 
@@ -350,6 +362,18 @@ var rollback = new SubCommand("rollback", "Rolls back the last deployment. This 
 rollback.TreatUnmatchedTokensAsErrors = false;
 rollback.SetAction(Handlers.GenerateAutoAction("rollback"));
 
+var envArgs = new Argument<string[]>("env")
+{
+    Arity = ArgumentArity.ZeroOrMore,
+    Description = "Environment variables to set in the form KEY=VALUE or path to envFile.",
+};
+
+var runArg = new Argument<string>("file")
+{
+    Arity = ArgumentArity.ExactlyOne,
+    Description = "Files to run.",
+};
+
 var rootCommand = new RootCommand("rex is a task runner")
 {
     Options.File,
@@ -364,7 +388,7 @@ var rootCommand = new RootCommand("rex is a task runner")
     listAllCommand,
     tasksCommand,
     jobsCommand,
-    runCommand,
+    targetCommand,
     buildCommand,
     cleanCommand,
     testCommand,

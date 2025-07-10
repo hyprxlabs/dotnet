@@ -5,14 +5,15 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageVersion Include="AsyncFixer" Version="1.6.0" />
-    <PackageVersion Include="Hyprx.Core" Version="[0.0.0-alpha.1,)" />
-    <PackageVersion Include="Hyprx.Exec" Version="[0.0.0-alpha.1,)" />
-    <PackageVersion Include="Hyprx.Ansi" Version="[0.0.0-alpha.1,)" />
-    <PackageVersion Include="Hyprx.DotEnv" Version="[0.0.0-alpha.1,)" />
-    <PackageVersion Include="Hyprx.Lodi" Version="[0.0.0-alpha.1,)" />
-    <PackageVersion Include="Hyprx.Secrets" Version="[0.0.0-alpha.1,)" />
-    <PackageVersion Include="Hyprx.Secrets.OperatingSystem" Version="[0.0.0-alpha.1,)" />
-    <PackageVersion Include="Hyprx.Shell" Version="[0.0.0-alpha.1,)" />
+    <PackageVersion Include="Hyprx.Core" Version="[0.0.0-alpha.2,)" />
+    <PackageVersion Include="Hyprx.Exec" Version="[0.0.0-alpha.2,)" />
+    <PackageVersion Include="Hyprx.Ansi" Version="[0.0.0-alpha.2,)" />
+    <PackageVersion Include="Hyprx.DotEnv" Version="[0.0.0-alpha.2,)" />
+    <PackageVersion Include="Hyprx.DotEnv.Expansion" Version="[0.0.0-alpha.2,)" />
+    <PackageVersion Include="Hyprx.Lodi" Version="[0.0.0-alpha.2,)" />
+    <PackageVersion Include="Hyprx.Secrets" Version="[0.0.0-alpha.2,)" />
+    <PackageVersion Include="Hyprx.Secrets.OperatingSystem" Version="[0.0.0-alpha.2,)" />
+    <PackageVersion Include="Hyprx.Shell" Version="[0.0.0-alpha.2,)" />
     <PackageVersion Include="Hyprx.Rex.Console" Version="[0.0.0-alpha.0,)" />
     <PackageVersion Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="4.14.0" />
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />

@@ -3,24 +3,21 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
-    <AssemblyName>rex</AssemblyName>
+    <AssemblyName>dotnet-rex</AssemblyName>
     <NoWarn>$(NoWarn);SA1516</NoWarn>
 
     <PackAsTool>true</PackAsTool>
     <PackageId>dotnet-rex</PackageId>
-    <ToolCommandName>rex</ToolCommandName>
-    
- 
-
+    <ToolCommandName>dotnet-rex</ToolCommandName>
     <PackageLicenseFile Condition="Exists('$(LicensePath)')">LICENSE.md</PackageLicenseFile>
     <PackageIcon>hyprx_logo_256.png</PackageIcon>
   </PropertyGroup>
 
   <PropertyGroup>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageTags>Hyprx.Rex.Pipelines Rex TaskRunnner Tasks Runner</PackageTags>
+    <PackageTags>Rex Tasks Jobs Runner</PackageTags>
     <Description>
-        Hyprx.Rex.Pipelines provides the core pipelines that execute rex tasks, jobs, and deployments.
+        Rex runs rex tasks, jobs, and deployments.
     </Description>
     <PackageReleaseNotes Condition="Exists('$(MSBuildProjectDirectory)/CHANGELOG.md')">
       $([System.IO.File]::ReadAllText("$(MSBuildProjectDirectory)/CHANGELOG.md"))
@@ -37,6 +34,8 @@
     <PackageReference Include="System.CommandLine" />
     <PackageReference Include="Hyprx.Core" />
     <PackageReference Include="Hyprx.Exec" />
+    <PackageReference Include="Hyprx.DotEnv" />
+    <PackageReference Include="Hyprx.DotEnv.Expansion" />
     <PackageReference Include="Hyprx.Ansi" />
   </ItemGroup>
 
