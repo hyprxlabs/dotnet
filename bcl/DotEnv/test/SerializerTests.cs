@@ -14,7 +14,7 @@ public static class SerializerTests
 TEST="Hello World"
 """);
         Assert.NotNull(env);
-        Assert.IsType<Dictionary<string, string>>(env);
+        Assert.IsType<OrderedDictionary<string, string>>(env);
         Assert.Equal("Hello World", env["TEST"]);
     }
 
@@ -30,7 +30,7 @@ PW=X232dwe)()_+!@
             envContent);
 
         Assert.NotNull(env);
-        Assert.IsType<Dictionary<string, string>>(env);
+        Assert.IsType<OrderedDictionary<string, string>>(env);
         Assert.Equal("hello_world", env["TEST"]);
         Assert.Equal("1", env["NUMBER"]);
         Assert.Equal("X232dwe)()_+!@", env["PW"]);
