@@ -211,7 +211,7 @@ JSON={
 """;
         var env = DotEnvSerializer.DeserializeDocument(
             envContent,
-            new DotEnvSerializerOptions { AllowJson = true });
+            new DotEnvSerializerOptions { Json = true });
 
         Assert.NotNull(env);
         Assert.True(env.Count is 1);
@@ -237,7 +237,7 @@ TEST=hello_world
 """;
         var env = DotEnvSerializer.DeserializeDocument(
             envContent,
-            new DotEnvSerializerOptions { AllowYaml = true });
+            new DotEnvSerializerOptions { Yaml = true });
 
         Assert.NotNull(env);
         Assert.Equal(2, env.Count);
@@ -313,5 +313,22 @@ CARRIAGE_RETURN="\r"
             result = result.Replace("\r\n", "\n");
 
         Assert.Equal(expected, result);
+    }
+
+    [Fact]
+    public static void ReadWithCommandSubstitution()
+    {
+        var content = """
+PW=X232dwe)()_+!@
+TEST="$(echo "world") yo"
+""";
+        var env = DotEnvSerializer.DeserializeDocument(
+            content,
+            new DotEnvSerializerOptions { QuotedCommandSubstitution = true });
+
+        Assert.NotNull(env);
+        Assert.Equal(2, env.Count);
+        Assert.Equal("X232dwe)()_+!@", env["PW"]);
+        Assert.Equal("$(echo \"world\") yo", env["TEST"]);
     }
 }

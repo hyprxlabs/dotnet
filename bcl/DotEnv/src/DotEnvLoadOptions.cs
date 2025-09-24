@@ -12,9 +12,9 @@ public class DotEnvLoadOptions : DotEnvSerializerOptions
     {
         var copy = new DotEnvLoadOptions()
         {
-            AllowBackticks = this.AllowBackticks,
-            AllowJson = this.AllowJson,
-            AllowYaml = this.AllowYaml,
+            Backticks = this.Backticks,
+            Json = this.Json,
+            Yaml = this.Yaml,
             Files = this.Files,
             Content = this.Content,
             OverrideEnvironment = this.OverrideEnvironment,

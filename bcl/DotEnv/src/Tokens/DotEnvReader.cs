@@ -16,6 +16,10 @@ public class DotEnvReader
 
     private TokenKind tokenKind = TokenKind.None;
 
+    private bool inCommandSubstitution = false;
+
+    private bool inCommandSubstitutionQuote = false;
+
     private int lineNumber = 1;
 
     private int columnNumber = 1;
@@ -137,7 +141,7 @@ public class DotEnvReader
                                     continue;
                                 case '{':
                                     // if we don't allow json, then append and continue
-                                    if (!this.options.AllowJson)
+                                    if (!this.options.Json)
                                     {
                                         this.buffer.Append(c);
                                         continue;
@@ -148,7 +152,7 @@ public class DotEnvReader
                                     continue;
                                 case '-':
                                     // if we don't allow yaml, then append and continue
-                                    if (!this.options.AllowYaml)
+                                    if (!this.options.Yaml)
                                     {
                                         this.buffer.Append(c);
                                         continue;
@@ -322,11 +326,42 @@ public class DotEnvReader
                                 this.buffer.Append(c);
                                 this.buffer.Append(next);
                             }
+
+                            if (this.options.QuotedCommandSubstitution)
+                            {
+                                if (!this.inCommandSubstitution && c is '$' && this.capture is Capture.DoubleQuote && this.reader.Peek() is '(')
+                                {
+                                    this.inCommandSubstitution = true;
+                                    this.buffer.Append(c);
+                                    continue;
+                                }
+
+                                if (this.inCommandSubstitution)
+                                {
+                                    // if we're in a quoted value inside a command substitution, then we need
+                                    // to include the ')' as part of the quoted value, rather than terminating
+                                    // the command substitution.
+                                    if (c is ')' && !this.inCommandSubstitutionQuote)
+                                    {
+                                        this.inCommandSubstitution = false;
+                                        this.buffer.Append(c);
+                                        continue;
+                                    }
+
+                                    if (c is '"')
+                                    {
+                                        this.inCommandSubstitutionQuote = !this.inCommandSubstitutionQuote;
+                                    }
+
+                                    this.buffer.Append(c);
+                                    continue;
+                                }
+                            }
                         }
 
                         // if the multiline capture is terminated, then we're done.
                         if (this.HandleMultiLineCapture(c))
-                                return true;
+                            return true;
 
                         if (this.buffer.Length == 0 && char.IsWhiteSpace(c))
                             continue;
@@ -379,7 +414,8 @@ public class DotEnvReader
                     this.Current = new EnvStringToken(
                         this.buffer.ToArray(),
                         this.lineNumber,
-                        this.columnNumber) { Capture = Capture.SingleQuote };
+                        this.columnNumber)
+                    { Capture = Capture.SingleQuote };
                     this.buffer.Clear();
                     this.Type = EnvTokenType.String;
                     return true;
@@ -402,7 +438,8 @@ public class DotEnvReader
                     this.Current = new EnvStringToken(
                         this.buffer.ToArray(),
                         this.lineNumber,
-                        this.columnNumber) { Capture = Capture.Backtick };
+                        this.columnNumber)
+                    { Capture = Capture.Backtick };
                     this.buffer.Clear();
                     this.Type = EnvTokenType.String;
                     return true;
@@ -419,7 +456,8 @@ public class DotEnvReader
                     this.Current = new EnvJsonToken(
                         this.buffer.ToArray(),
                         this.lineNumber,
-                        this.columnNumber) { Capture = Capture.Brackets };
+                        this.columnNumber)
+                    { Capture = Capture.Brackets };
                     this.buffer.Clear();
                     this.Type = EnvTokenType.Json;
                     return true;
@@ -455,7 +493,8 @@ public class DotEnvReader
                     this.Current = new EnvYamlToken(
                         this.buffer.ToArray(),
                         this.lineNumber,
-                        this.columnNumber) { Capture = Capture.FrontMatter };
+                        this.columnNumber)
+                    { Capture = Capture.FrontMatter };
                     this.buffer.Clear();
                     this.Type = EnvTokenType.Yaml;
                     return true;

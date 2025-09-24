@@ -54,8 +54,8 @@ public class EnvExpandOptions
 
     /// <summary>
     /// Gets or sets a function to retrieve all environment variables as a dictionary. For
-    /// command substitution scenarios, this can be used to provide the full environment context
-    /// when this property is set.
+    /// command substitution scenarios, this can be used to provide an isolated set of variables
+    /// rather than using the process environment variables.
     /// </summary>
     public Func<IDictionary<string, string>>? GetAllVariables { get; set; }
 }
