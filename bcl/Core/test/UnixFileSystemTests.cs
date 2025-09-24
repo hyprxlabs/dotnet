@@ -2,6 +2,8 @@ using System.Diagnostics;
 
 using Hyprx.Extras;
 
+[assembly: CaptureConsole(CaptureOut = true)]
+
 namespace Hyprx.IO.Tests;
 
 public static class UnixFileSystemTests

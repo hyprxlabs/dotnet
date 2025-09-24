@@ -23,7 +23,6 @@ public abstract class Block<T> : SyncBlock<T>, IAsyncBlock<T>
 
 public abstract class Block : Block<Never>, IAsyncBlock, ISyncBlock
 {
-
     public static Block<T> New<T>(Func<CancellationToken, Result<T>> run)
         where T : notnull
     {

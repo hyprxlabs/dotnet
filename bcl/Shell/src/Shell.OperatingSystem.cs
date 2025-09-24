@@ -4,7 +4,7 @@ namespace Hyprx;
 
 public static partial class Shell
 {
-    public static partial class Os
+    public static partial class OS
     {
         private static readonly Lazy<bool> s_isWindows = new(() => System.OperatingSystem.IsWindows());
         private static readonly Lazy<bool> s_isLinux = new(() => System.OperatingSystem.IsLinux());
