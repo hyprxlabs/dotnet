@@ -49,6 +49,7 @@ public class EnvExpand_Tests
     {
         var vars = new Dictionary<string, string>();
         var input = "Path: ${PATH:=/usr/bin}";
+        var o1 = OptionsWithVars(vars);
         var result = Env.Expand(input, OptionsWithVars(vars));
         Assert.Equal("Path: /usr/bin", result.ToString());
         Assert.Equal("/usr/bin", vars["PATH"]);
@@ -203,6 +204,8 @@ public class EnvExpand_Tests
         return new EnvExpandOptions
         {
             GetVariable = k => vars.TryGetValue(k, out var v) ? v : null,
+            SetVariable = (k, v) => vars[k] = v,
+            GetAllVariables = () => vars,
         };
     }
 }
