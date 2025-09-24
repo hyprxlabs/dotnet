@@ -73,11 +73,15 @@ release:
 dry-publish:
     #!{{ bash }}
     echo "Running dry-publish command"
+    rm -rf ./.artifacts/packs
+    mkdir -p ./.artifacts/packs
     dotnet pack -c Release --include-symbols --include-source --no-build -o ./.artifacts/packs
     echo "Packages would be pushed to NuGet, but this is a dry run."
 
 publish:
     #!{{ bash }}
     echo "Running publish command"
+    rm -rf ./.artifacts/packs
+    mkdir -p ./.artifacts/packs
     dotnet pack -c Release --include-symbols --include-source --no-build -o ./.artifacts/packs
     dotnet nuget push ./.artifacts/packs/Hyprx.*.nupkg -k $HYPRX_NUGET_KEY -s https://api.nuget.org/v3/index.json --skip-duplicate
